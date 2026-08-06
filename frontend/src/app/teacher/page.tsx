@@ -1,3 +1,5 @@
+import ExamCreationForm from '@/components/ExamCreationForm';
+
 export default function TeacherDashboardPage() {
   return (
     <main className="min-h-screen bg-slate-950 p-6 text-white">
@@ -6,7 +8,7 @@ export default function TeacherDashboardPage() {
           <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Teacher dashboard</p>
           <h1 className="mt-2 text-3xl font-semibold">Upload PDFs, generate exams, and review analytics</h1>
           <p className="mt-3 max-w-2xl text-slate-300">
-            This module will power exam creation, student insights, reporting, and teacher operations.
+            This module powers exam creation, student insights, reporting, and teacher operations.
           </p>
         </div>
 
@@ -21,6 +23,14 @@ export default function TeacherDashboardPage() {
               <p className="mt-2 text-sm text-slate-400">{item.description}</p>
             </div>
           ))}
+        </div>
+
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <h2 className="text-2xl font-semibold">Create your first exam</h2>
+          <p className="mt-2 text-slate-300">This form saves a new exam to Supabase for your teacher account.</p>
+          <div className="mt-4">
+            <ExamCreationForm />
+          </div>
         </div>
       </div>
     </main>

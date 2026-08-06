@@ -37,7 +37,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/20 via-slate-900 to-violet-500/20 p-8 shadow-2xl shadow-cyan-500/10">
+          <div className="rounded-3xl border border-white/10 bg-linear-to-br from-cyan-500/20 via-slate-900 to-violet-500/20 p-8 shadow-2xl shadow-cyan-500/10">
             <div className="space-y-4">
               <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-5">
                 <p className="text-sm uppercase tracking-[0.25em] text-cyan-300">Live exam overview</p>

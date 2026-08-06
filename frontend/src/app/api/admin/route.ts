@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAdminSessionToken } from '@/lib/admin';
+import { getAdminOverview } from '@/lib/reporting';
 
 export async function GET() {
   const cookieStore = await cookies();
@@ -10,13 +11,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return NextResponse.json({
-    overview: {
-      users: 0,
-      teachers: 0,
-      students: 0,
-      exams: 0,
-    },
-    activity: [],
-  });
+  return NextResponse.json(await getAdminOverview());
 }

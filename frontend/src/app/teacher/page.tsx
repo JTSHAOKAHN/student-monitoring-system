@@ -1,4 +1,5 @@
 import ExamCreationForm from '@/components/ExamCreationForm';
+import PdfExamComposer from '@/components/PdfExamComposer';
 
 export default function TeacherDashboardPage() {
   return (
@@ -8,7 +9,7 @@ export default function TeacherDashboardPage() {
           <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Teacher dashboard</p>
           <h1 className="mt-2 text-3xl font-semibold">Upload PDFs, generate exams, and review analytics</h1>
           <p className="mt-3 max-w-2xl text-slate-300">
-            This module powers exam creation, student insights, reporting, and teacher operations.
+            This module now supports PDF-based exam creation with AI question drafting and teacher editing before publishing.
           </p>
         </div>
 
@@ -24,6 +25,8 @@ export default function TeacherDashboardPage() {
             </div>
           ))}
         </div>
+
+        <PdfExamComposer />
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
           <h2 className="text-2xl font-semibold">Create your first exam</h2>

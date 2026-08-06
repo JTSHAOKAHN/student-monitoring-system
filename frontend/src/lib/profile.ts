@@ -2,6 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Role = 'teacher' | 'student' | 'admin';
 
+function normalizeRole(role: Role) {
+  return role === 'admin' ? 'admin' : role;
+}
+
 export async function ensureUserProfile(
   supabase: SupabaseClient | null,
   role: Role,
@@ -21,17 +25,17 @@ export async function ensureUserProfile(
     return null;
   }
 
-  const normalizedRole = role === 'admin' ? 'admin' : role;
+  const normalizedRole = normalizeRole(role);
   const profilePayload = {
     auth_user_id: user.id,
-    full_name: fullName || (user.user_metadata?.full_name as string | undefined) || user.email || 'User',
+    full_name: fullName?.trim() || (user.user_metadata?.full_name as string | undefined) || user.email || 'User',
     role: normalizedRole,
-    email: email || user.email || '',
+    email: email?.trim() || user.email || '',
   };
 
   const { data: existingProfile, error: selectError } = await supabase
     .from('users')
-    .select('id')
+    .select('id, role')
     .eq('auth_user_id', user.id)
     .maybeSingle();
 

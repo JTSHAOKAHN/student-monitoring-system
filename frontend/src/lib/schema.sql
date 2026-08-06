@@ -3,9 +3,9 @@ create extension if not exists "uuid-ossp";
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   auth_user_id uuid unique,
-  full_name text,
-  role text not null default 'student',
-  email text unique,
+  full_name text not null,
+  role text not null default 'student' check (role in ('teacher','student','admin')),
+  email text unique not null,
   created_at timestamptz default now()
 );
 
@@ -40,8 +40,8 @@ create table if not exists public.classes (
 
 create table if not exists public.exams (
   id uuid primary key default gen_random_uuid(),
-  title text not null,
-  description text,
+  title text not null check (length(title) between 3 and 120),
+  description text not null check (length(description) between 10 and 2000),
   teacher_id uuid references public.teachers(id) on delete set null,
   class_id uuid references public.classes(id) on delete set null,
   published boolean default false,
@@ -51,9 +51,9 @@ create table if not exists public.exams (
 create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
   exam_id uuid references public.exams(id) on delete cascade,
-  prompt text not null,
-  question_type text not null,
-  difficulty text,
+  prompt text not null check (length(prompt) between 3 and 2000),
+  question_type text not null check (question_type in ('multiple_choice','essay','true_false','short_answer')),
+  difficulty text default 'medium',
   created_at timestamptz default now()
 );
 
@@ -69,8 +69,8 @@ create table if not exists public.attempts (
   id uuid primary key default gen_random_uuid(),
   exam_id uuid references public.exams(id) on delete cascade,
   student_id uuid references public.students(id) on delete cascade,
-  status text not null default 'in_progress',
-  score numeric,
+  status text not null default 'in_progress' check (status in ('in_progress','submitted','abandoned')),
+  score numeric check (score between 0 and 100),
   started_at timestamptz default now(),
   submitted_at timestamptz
 );

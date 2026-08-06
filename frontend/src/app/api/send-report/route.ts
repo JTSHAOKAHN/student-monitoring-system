@@ -1,20 +1,29 @@
 import { NextRequest } from 'next/server';
 import { resend } from '@/lib/resend';
+import { validateEmailPayload } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
-    const { to, subject, html } = await request.json();
-
-    if (!to || !subject || !html) {
-      return Response.json({ error: 'Missing required fields' }, { status: 400 });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: 'Invalid JSON body.' }, { status: 400 });
     }
+
+    const validation = validateEmailPayload(body);
+    if (!validation.ok) {
+      return Response.json({ error: validation.error }, { status: 400 });
+    }
+
+    const { to, subject, html } = validation.data;
 
     if (!resend) {
       return Response.json({ error: 'Resend is not configured yet' }, { status: 503 });
     }
 
     const data = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       to: [to],
       subject,
       html,

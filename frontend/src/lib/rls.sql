@@ -95,3 +95,27 @@ create policy "Users can view their own notifications"
       where u.id = notifications.user_id and u.auth_user_id = auth.uid()
     )
   );
+
+drop policy if exists "Students can view their own attempts" on public.attempts;
+create policy "Students can view their own attempts"
+  on public.attempts
+  for select
+  using (
+    exists (
+      select 1 from public.students s
+      join public.users u on u.id = s.user_id
+      where s.id = attempts.student_id and u.auth_user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Students can insert their own attempts" on public.attempts;
+create policy "Students can insert their own attempts"
+  on public.attempts
+  for insert
+  with check (
+    exists (
+      select 1 from public.students s
+      join public.users u on u.id = s.user_id
+      where s.id = attempts.student_id and u.auth_user_id = auth.uid()
+    )
+  );

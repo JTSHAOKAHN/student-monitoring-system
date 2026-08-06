@@ -8,6 +8,7 @@ export default function AdminDashboard() {
   const [view, setView] = useState<'overview' | 'users' | 'exams'>('overview');
   const [stats, setStats] = useState([{ title: 'Total users', value: '—' }, { title: 'Teachers', value: '—' }, { title: 'Students', value: '—' }, { title: 'Exams', value: '—' }]);
   const [activity, setActivity] = useState<Array<{ title: string; detail: string }>>([]);
+  const [auditItems, setAuditItems] = useState<Array<{ title: string; detail: string }>>([]);
 
   useEffect(() => {
     async function loadAdminData() {
@@ -25,6 +26,7 @@ export default function AdminDashboard() {
         { title: 'Exams', value: String(data.overview?.exams ?? 0) },
       ]);
       setActivity(data.activity ?? []);
+      setAuditItems(data.audit ?? []);
     }
 
     loadAdminData();
@@ -43,8 +45,18 @@ export default function AdminDashboard() {
     if (view === 'exams') {
       return (
         <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-          <h2 className="text-xl font-semibold">Exam oversight</h2>
-          <p className="mt-2 text-sm text-slate-400">This area will later show published exams, drafts, and monitoring signals.</p>
+          <h2 className="text-xl font-semibold">Audit trail</h2>
+          {auditItems.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-400">No audit entries yet. Once teachers upload PDFs and publish exams, they will appear here.</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm text-slate-400">
+              {auditItems.map((item) => (
+                <li key={item.title} className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                  <span className="font-medium text-slate-200">{item.title}</span>: {item.detail}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       );
     }

@@ -7,6 +7,9 @@ export default function PdfExamComposer() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [pdfId, setPdfId] = useState<string | null>(null);
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -15,21 +18,30 @@ export default function PdfExamComposer() {
     }
 
     setFileName(file.name);
+    setTitle(`AI-generated exam from ${file.name}`);
+    setDescription('Teacher-edited questions generated from the uploaded PDF.');
     setLoading(true);
     setMessage(null);
 
     try {
-      const text = await file.text();
-      const generated = [
-        `Based on ${file.name}, draft a short-answer question about the key ideas in the document.`,
-        `Create a multiple-choice question that tests a major concept from ${file.name}.`,
-        `Write an essay prompt that asks the learner to explain the main argument in ${file.name}.`,
-      ];
+      const formData = new FormData();
+      formData.append('file', file);
 
-      setQuestions(generated);
+      const response = await fetch('/api/pdf-exam', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Unable to create draft questions.');
+      }
+
+      setQuestions(result.questions || []);
+      setPdfId(result.pdfId || null);
       setMessage('AI draft questions created. You can edit them before publishing.');
-    } catch {
-      setMessage('Unable to process the uploaded file.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to process the uploaded file.');
     } finally {
       setLoading(false);
     }
@@ -44,24 +56,30 @@ export default function PdfExamComposer() {
     setMessage(null);
 
     try {
-      const response = await fetch('/api/exams', {
+      const response = await fetch('/api/exams/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `AI-generated exam from ${fileName || 'uploaded PDF'}`,
-          description: `Teacher-edited questions:\n${questions.join('\n')}`,
+          title,
+          description,
+          questions: questions.filter(Boolean),
+          pdfId,
         }),
       });
 
+      const result = await response.json();
       if (!response.ok) {
-        throw new Error('Unable to create exam.');
+        throw new Error(result.error || 'Unable to publish the exam draft.');
       }
 
       setMessage('Exam draft published successfully.');
       setQuestions([]);
       setFileName('');
-    } catch {
-      setMessage('Unable to publish the exam draft.');
+      setTitle('');
+      setDescription('');
+      setPdfId(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to publish the exam draft.');
     } finally {
       setLoading(false);
     }
@@ -79,16 +97,28 @@ export default function PdfExamComposer() {
       </label>
 
       {questions.length > 0 && (
-        <div className="mt-6 space-y-3">
-          <h3 className="text-lg font-semibold">Draft questions</h3>
-          {questions.map((question, index) => (
-            <textarea
-              key={`${question}-${index}`}
-              value={question}
-              onChange={(event) => updateQuestion(index, event.target.value)}
-              className="min-h-24 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white"
-            />
-          ))}
+        <div className="mt-6 space-y-4">
+          <div>
+            <label className="mb-2 block text-sm text-slate-300">Exam title</label>
+            <input value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white" />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-slate-300">Exam description</label>
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-24 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white" />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold">Draft questions</h3>
+            {questions.map((question, index) => (
+              <textarea
+                key={`${question}-${index}`}
+                value={question}
+                onChange={(event) => updateQuestion(index, event.target.value)}
+                className="mt-3 min-h-24 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white"
+              />
+            ))}
+          </div>
 
           <button
             type="button"

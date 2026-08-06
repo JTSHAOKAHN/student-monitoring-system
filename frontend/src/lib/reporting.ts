@@ -43,6 +43,24 @@ export async function getAdminOverview() {
         title: 'Teacher exam creation',
         detail: 'Teacher-created exams are now stored and available for oversight.',
       },
+      {
+        title: 'PDF-assisted drafting',
+        detail: 'Teachers can now upload PDFs and generate draft questions for review.',
+      },
+    ],
+    audit: [
+      {
+        title: 'PDF upload workflow',
+        detail: 'Uploaded files are stored in the pdf_uploads table and linked to generated question drafts.',
+      },
+      {
+        title: 'Exam publishing trail',
+        detail: 'Teacher-published drafts become exam records and their questions are stored in the questions table.',
+      },
+      {
+        title: 'Admin oversight',
+        detail: 'The admin dashboard can now surface the core activity trail for the platform.',
+      },
     ],
   };
 }

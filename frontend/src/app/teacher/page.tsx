@@ -6,19 +6,25 @@ import Link from 'next/link';
 
 export default function TeacherDashboardPage() {
   return (
-    <main className="min-h-screen bg-slate-950 p-6 text-white">
+    <main className="min-h-screen bg-slate-50 p-6 text-slate-800">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <div className="flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
           <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Teacher dashboard</p>
-            <h1 className="mt-2 text-3xl font-semibold">Upload PDFs, generate exams, and review analytics</h1>
-            <p className="mt-3 max-w-2xl text-slate-300">
+            <p className="text-xs font-medium uppercase tracking-widest text-violet-600">Teacher Dashboard</p>
+            <h1 className="mt-2 text-3xl font-normal text-slate-800">Exam Management & Analytics</h1>
+            <p className="mt-3 max-w-2xl text-sm text-slate-600">
               Create AI-assisted exams from PDFs or images, publish to students, and monitor session analytics in real time.
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <NotificationPanel dark />
-            <Link href="/auth" className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">
+            <Link
+              href="/teacher/classroom"
+              className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100"
+            >
+              Classroom Monitor
+            </Link>
+            <NotificationPanel />
+            <Link href="/auth" className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">
               Account
             </Link>
           </div>
@@ -29,9 +35,9 @@ export default function TeacherDashboardPage() {
 
         <PdfExamComposer />
 
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <h2 className="text-2xl font-semibold">Create exam manually</h2>
-          <p className="mt-2 text-slate-300">Save a blank exam shell, then add questions via the PDF assistant above.</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-medium text-slate-800">Create Exam Manually</h2>
+          <p className="mt-2 text-sm text-slate-600">Save a blank exam shell, then add questions via the PDF assistant above.</p>
           <div className="mt-4">
             <ExamCreationForm />
           </div>

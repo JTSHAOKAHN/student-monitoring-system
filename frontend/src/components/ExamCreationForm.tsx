@@ -36,24 +36,24 @@ export default function ExamCreationForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-cyan-400/20 bg-slate-900/80 p-6">
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
       <div>
-        <label className="mb-2 block text-sm text-slate-300">Exam title</label>
+        <label className="mb-2 block text-sm text-slate-700">Exam title</label>
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white"
+          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800"
           placeholder="Midterm Algebra"
           required
         />
       </div>
 
       <div>
-        <label className="mb-2 block text-sm text-slate-300">Description</label>
+        <label className="mb-2 block text-sm text-slate-700">Description</label>
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          className="min-h-28 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white"
+          className="min-h-28 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800"
           placeholder="Describe the exam, grading expectations, or class context."
           required
         />
@@ -62,12 +62,12 @@ export default function ExamCreationForm() {
       <button
         type="submit"
         disabled={loading}
-        className="rounded-2xl bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
+        className="rounded-lg bg-violet-600 px-4 py-3 font-medium text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {loading ? 'Creating...' : 'Create exam'}
       </button>
 
-      {message && <p className="text-sm text-cyan-300">{message}</p>}
+      {message && <p className="text-sm text-violet-700">{message}</p>}
     </form>
   );
 }

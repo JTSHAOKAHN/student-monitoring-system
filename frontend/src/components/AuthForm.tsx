@@ -39,8 +39,6 @@ export default function AuthForm() {
 
     try {
       if (mode === 'sign-up') {
-        console.log('Attempting sign up with:', { email, role, fullName });
-        
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -53,10 +51,7 @@ export default function AuthForm() {
           },
         });
 
-        console.log('Sign up response:', { data, error });
-
         if (error) {
-          console.error('Supabase sign up error:', error);
           throw error;
         }
 
@@ -68,13 +63,10 @@ export default function AuthForm() {
 
         // If email verification is disabled in Supabase, try auto-login
         if (data.user && !data.session) {
-          console.log('No session, attempting auto-login...');
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email,
             password,
           });
-          
-          console.log('Auto-login response:', { signInData, signInError });
           
           if (!signInError && signInData.session) {
             await ensureUserProfile(supabase, role, fullName, email);
@@ -85,38 +77,20 @@ export default function AuthForm() {
 
         setMessage('Account created. Please check your email for the confirmation link.');
       } else {
-        console.log('Attempting sign in with:', { email, role });
-        
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        console.log('Sign in response:', { data, error });
-
         if (error) {
-          console.error('Supabase sign in error:', error);
           throw error;
         }
 
         const userRole = (data.user?.user_metadata?.role as Role | undefined) || role;
-        
-        // Ensure profile exists via API
-        const profileResponse = await fetch('/api/auth/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, role: userRole }),
-        });
-
-        if (!profileResponse.ok) {
-          console.error('Profile check failed during sign in');
-        }
-
+        await ensureUserProfile(supabase, userRole, undefined, email);
         router.push(userRole === 'student' ? '/student' : '/teacher');
       }
     } catch (error: unknown) {
-      console.error('Auth error:', error);
-      
       let errorMessage = 'Authentication failed.';
       if (error instanceof Error) {
         errorMessage = error.message;

@@ -26,6 +26,10 @@ create policy "Users can update their own profile" on public.users for update us
 drop policy if exists "Users can insert their own profile" on public.users;
 create policy "Users can insert their own profile" on public.users for insert with check (auth.uid() = auth_user_id);
 
+-- Allow authenticated users to insert their own profile during signup
+drop policy if exists "Users can insert profile on signup" on public.users;
+create policy "Users can insert profile on signup" on public.users for insert with check (auth.uid() = auth_user_id);
+
 -- Teachers
 drop policy if exists "Teachers can view their own teacher row" on public.teachers;
 create policy "Teachers can view their own teacher row" on public.teachers for select using (

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { ensureUserProfile } from '@/lib/profile';
 
 type AuthMode = 'sign-in' | 'sign-up';
 type Role = 'teacher' | 'student' | 'admin';
@@ -53,7 +52,20 @@ export default function AuthForm() {
         }
 
         if (data.session) {
-          await ensureUserProfile(supabase, role, fullName, email);
+          // Create user profile via API to bypass RLS
+          const profileResponse = await fetch('/api/auth/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fullName, email, role }),
+          });
+
+          if (!profileResponse.ok) {
+            const profileError = await profileResponse.json();
+            console.error('Profile creation failed:', profileError);
+            setMessage('Account created but profile setup failed. Please try logging in.');
+            return;
+          }
+
           router.push(role === 'student' ? '/student' : role === 'admin' ? '/teacher' : '/teacher');
           return;
         }
@@ -92,7 +104,18 @@ export default function AuthForm() {
         }
 
         const userRole = (data.user?.user_metadata?.role as Role | undefined) || role;
-        await ensureUserProfile(supabase, userRole, undefined, email);
+        
+        // Ensure profile exists via API
+        const profileResponse = await fetch('/api/auth/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify { email, role: userRole },
+        });
+
+        if (!profileResponse.ok) {
+          console.error('Profile check failed during sign in');
+        }
+
         router.push(userRole === 'student' ? '/student' : '/teacher');
       }
     } catch (error: unknown) {

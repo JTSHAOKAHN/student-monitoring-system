@@ -26,6 +26,14 @@ export default function AuthForm() {
     // Test teacher bypass for development
     if (email === 'teacher@test.com' && role === 'teacher') {
       console.log('Using test teacher bypass');
+      
+      // Log login event for admin monitoring
+      fetch('/api/activity/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 'test-teacher', role: 'teacher', email }),
+      }).catch(err => console.error('Failed to log login:', err));
+      
       router.push('/teacher');
       setLoading(false);
       return;
@@ -88,6 +96,14 @@ export default function AuthForm() {
 
         const userRole = (data.user?.user_metadata?.role as Role | undefined) || role;
         await ensureUserProfile(supabase, userRole, undefined, email);
+        
+        // Log login event for admin monitoring
+        fetch('/api/activity/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: data.user?.id, role: userRole, email }),
+        }).catch(err => console.error('Failed to log login:', err));
+        
         router.push(userRole === 'student' ? '/student' : '/teacher');
       }
     } catch (error: unknown) {

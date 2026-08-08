@@ -19,11 +19,19 @@ interface AdminExam {
   created_at: string;
 }
 
+interface LoginActivity {
+  title: string;
+  detail: string;
+  time: string;
+  role: string;
+}
+
 export default function AdminPortal() {
   const router = useRouter();
-  const [view, setView] = useState<'overview' | 'users' | 'exams' | 'notifications'>('overview');
-  const [stats, setStats] = useState({ users: 0, teachers: 0, students: 0, exams: 0, attempts: 0, flagged: 0 });
+  const [view, setView] = useState<'overview' | 'users' | 'exams' | 'notifications' | 'activity'>('overview');
+  const [stats, setStats] = useState({ users: 0, teachers: 0, students: 0, exams: 0, attempts: 0, flagged: 0, active_sessions: 0 });
   const [activity, setActivity] = useState<Array<{ title: string; detail: string }>>([]);
+  const [loginActivity, setLoginActivity] = useState<LoginActivity[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [exams, setExams] = useState<AdminExam[]>([]);
   const [notifications, setNotifications] = useState<Array<{ id: string; title: string; type: string; created_at: string }>>([]);
@@ -39,6 +47,7 @@ export default function AdminPortal() {
       const data = await response.json();
       setStats(data.overview ?? {});
       setActivity(data.activity ?? []);
+      setLoginActivity(data.loginActivity ?? []);
       setUsers(data.users ?? []);
       setExams(data.exams ?? []);
       setNotifications(data.recentNotifications ?? []);
@@ -58,15 +67,16 @@ export default function AdminPortal() {
     { label: 'Students', value: stats.students },
     { label: 'Exams', value: stats.exams },
     { label: 'Attempts', value: stats.attempts },
+    { label: 'Active sessions', value: stats.active_sessions },
     { label: 'Flagged sessions', value: stats.flagged },
   ];
 
   const content = useMemo(() => {
     if (view === 'users') {
       return (
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-white/10 bg-slate-950/60 text-slate-400">
+            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
@@ -76,18 +86,18 @@ export default function AdminPortal() {
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id} className="border-b border-white/5">
-                  <td className="px-4 py-3 text-slate-200">{user.full_name}</td>
-                  <td className="px-4 py-3 text-slate-400">{user.email}</td>
+                <tr key={user.id} className="border-b border-slate-100">
+                  <td className="px-4 py-3 text-slate-800">{user.full_name}</td>
+                  <td className="px-4 py-3 text-slate-600">{user.email}</td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-300">{user.role}</span>
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs text-violet-700">{user.role}</span>
                   </td>
                   <td className="px-4 py-3 text-slate-500">{new Date(user.created_at).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {users.length === 0 && <p className="p-6 text-sm text-slate-400">No users registered yet.</p>}
+          {users.length === 0 && <p className="p-6 text-sm text-slate-600">No users registered yet.</p>}
         </div>
       );
     }
@@ -96,17 +106,17 @@ export default function AdminPortal() {
       return (
         <div className="space-y-3">
           {exams.map((exam) => (
-            <div key={exam.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/80 px-4 py-3">
+            <div key={exam.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
               <div>
-                <p className="font-medium text-slate-200">{exam.title}</p>
+                <p className="font-medium text-slate-800">{exam.title}</p>
                 <p className="text-xs text-slate-500">{new Date(exam.created_at).toLocaleString()}</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs ${exam.published ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
+              <span className={`rounded-full px-3 py-1 text-xs ${exam.published ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                 {exam.published ? 'Published' : 'Draft'}
               </span>
             </div>
           ))}
-          {exams.length === 0 && <p className="text-sm text-slate-400">No exams created yet.</p>}
+          {exams.length === 0 && <p className="text-sm text-slate-600">No exams created yet.</p>}
         </div>
       );
     }
@@ -115,77 +125,113 @@ export default function AdminPortal() {
       return (
         <ul className="space-y-2">
           {notifications.map((n) => (
-            <li key={n.id} className="rounded-xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm">
-              <span className="font-medium text-slate-200">{n.title}</span>
+            <li key={n.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+              <span className="font-medium text-slate-800">{n.title}</span>
               <span className="ml-2 text-xs text-slate-500">{n.type}</span>
             </li>
           ))}
-          {notifications.length === 0 && <p className="text-sm text-slate-400">No notifications sent yet.</p>}
+          {notifications.length === 0 && <p className="text-sm text-slate-600">No notifications sent yet.</p>}
         </ul>
+      );
+    }
+
+    if (view === 'activity') {
+      return (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+              <tr>
+                <th className="px-4 py-3">User</th>
+                <th className="px-4 py-3">Activity</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loginActivity.map((activity, index) => (
+                <tr key={index} className="border-b border-slate-100">
+                  <td className="px-4 py-3 text-slate-800">{activity.title}</td>
+                  <td className="px-4 py-3 text-slate-600">{activity.detail}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${
+                      activity.role === 'teacher' ? 'bg-violet-100 text-violet-700' :
+                      activity.role === 'student' ? 'bg-emerald-100 text-emerald-700' :
+                      'bg-amber-100 text-amber-700'
+                    }`}>
+                      {activity.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{activity.time}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {loginActivity.length === 0 && <p className="p-6 text-sm text-slate-600">No login activity recorded yet.</p>}
+        </div>
       );
     }
 
     return (
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-          <h2 className="text-xl font-semibold">System health</h2>
-          <p className="mt-2 text-sm text-slate-400">
+        <div className="rounded-xl border border-slate-200 bg-white p-6">
+          <h2 className="text-xl font-medium text-slate-800">System health</h2>
+          <p className="mt-2 text-sm text-slate-600">
             Platform is connected to Supabase. Admin auth is separate from user auth via env credentials.
           </p>
-          <Link href="/api/health" className="mt-4 inline-block text-sm text-cyan-400 hover:underline">
+          <Link href="/api/health" className="mt-4 inline-block text-sm text-violet-600 hover:underline">
             Check API health →
           </Link>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-          <h2 className="text-xl font-semibold">Recent activity</h2>
-          <ul className="mt-3 space-y-2 text-sm text-slate-400">
+        <div className="rounded-xl border border-slate-200 bg-white p-6">
+          <h2 className="text-xl font-medium text-slate-800">Recent activity</h2>
+          <ul className="mt-3 space-y-2 text-sm text-slate-600">
             {activity.map((item, i) => (
-              <li key={i} className="rounded-lg border border-white/5 bg-slate-950/40 px-3 py-2">
-                <span className="font-medium text-slate-200">{item.title}</span>: {item.detail}
+              <li key={i} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                <span className="font-medium text-slate-800">{item.title}</span>: {item.detail}
               </li>
             ))}
           </ul>
         </div>
       </div>
     );
-  }, [view, users, exams, notifications, activity]);
+  }, [view, users, exams, notifications, activity, loginActivity]);
 
   return (
-    <main className="min-h-screen bg-slate-950 p-6 text-white">
+    <main className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <div className="flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
           <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Admin portal</p>
-            <h1 className="mt-2 text-3xl font-semibold">Platform oversight</h1>
-            <p className="mt-3 max-w-2xl text-slate-300">
+            <p className="text-xs font-medium uppercase tracking-widest text-violet-600">Admin portal</p>
+            <h1 className="mt-2 text-3xl font-normal text-slate-800">Platform oversight</h1>
+            <p className="mt-3 max-w-2xl text-sm text-slate-600">
               Manage users, review exams, monitor flagged sessions, and inspect system activity.
             </p>
           </div>
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/10"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
           >
             Sign out
           </button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statCards.map((item) => (
-            <div key={item.label} className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
-              <p className="text-sm text-slate-400">{item.label}</p>
-              <p className="mt-2 text-2xl font-semibold">{item.value}</p>
+            <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm text-slate-600">{item.label}</p>
+              <p className="mt-2 text-2xl font-medium text-slate-800">{item.value}</p>
             </div>
           ))}
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {(['overview', 'users', 'exams', 'notifications'] as const).map((tab) => (
+          {(['overview', 'users', 'exams', 'notifications', 'activity'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setView(tab)}
-              className={`rounded-full px-4 py-2 text-sm capitalize ${view === tab ? 'bg-cyan-500 text-slate-950' : 'bg-slate-900 text-slate-300'}`}
+              className={`rounded-full px-4 py-2 text-sm capitalize ${view === tab ? 'bg-violet-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
             >
               {tab}
             </button>

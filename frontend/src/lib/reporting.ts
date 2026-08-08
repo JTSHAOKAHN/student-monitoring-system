@@ -5,8 +5,9 @@ export async function getAdminOverview() {
 
   if (!supabase) {
     return {
-      overview: { users: 0, teachers: 0, students: 0, exams: 0, attempts: 0, flagged: 0 },
+      overview: { users: 0, teachers: 0, students: 0, exams: 0, attempts: 0, flagged: 0, active_sessions: 0 },
       activity: [],
+      loginActivity: [],
       audit: [],
       users: [],
       exams: [],
@@ -14,13 +15,14 @@ export async function getAdminOverview() {
     };
   }
 
-  const [usersResult, teachersResult, studentsResult, examsResult, attemptsResult, flaggedResult] = await Promise.all([
+  const [usersResult, teachersResult, studentsResult, examsResult, attemptsResult, flaggedResult, activeSessionsResult] = await Promise.all([
     supabase.from('users').select('id', { count: 'exact', head: true }),
     supabase.from('teachers').select('id', { count: 'exact', head: true }),
     supabase.from('students').select('id', { count: 'exact', head: true }),
     supabase.from('exams').select('id', { count: 'exact', head: true }),
     supabase.from('attempts').select('id', { count: 'exact', head: true }),
     supabase.from('analytics').select('id', { count: 'exact', head: true }).gte('cheating_risk', 40),
+    supabase.from('exam_sessions').select('id', { count: 'exact', head: true }).is('status', 'active'),
   ]);
 
   const { data: users } = await supabase
@@ -47,6 +49,22 @@ export async function getAdminOverview() {
     .order('created_at', { ascending: false })
     .limit(10);
 
+  // Get recent activity with login information
+  const { data: monitoringEvents } = await supabase
+    .from('monitoring_events')
+    .select('id, event_type, details, created_at, users(full_name, role)')
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  const loginActivity = (monitoringEvents || [])
+    .filter(event => event.event_type === 'login' || event.event_type === 'logout')
+    .map((event) => ({
+      title: (event.users as { full_name?: string })?.full_name || 'User',
+      detail: `${event.event_type} — ${(event.users as { role?: string })?.role || 'User'}`,
+      time: new Date(event.created_at).toLocaleString(),
+      role: (event.users as { role?: string })?.role || 'user',
+    }));
+
   return {
     overview: {
       users: usersResult.count ?? 0,
@@ -55,11 +73,13 @@ export async function getAdminOverview() {
       exams: examsResult.count ?? 0,
       attempts: attemptsResult.count ?? 0,
       flagged: flaggedResult.count ?? 0,
+      active_sessions: activeSessionsResult.count ?? 0,
     },
     activity: (recentAttempts || []).map((a) => ({
       title: (a.students as { users?: { full_name?: string } })?.users?.full_name || 'Student',
       detail: `${(a.exams as { title?: string })?.title || 'Exam'} — ${a.status}${a.score != null ? ` (${a.score}%)` : ''}`,
     })),
+    loginActivity,
     audit: (exams || []).slice(0, 5).map((e) => ({
       title: e.title,
       detail: e.published ? 'Published' : 'Draft',

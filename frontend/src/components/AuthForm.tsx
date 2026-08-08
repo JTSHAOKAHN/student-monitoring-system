@@ -31,6 +31,8 @@ export default function AuthForm() {
 
     try {
       if (mode === 'sign-up') {
+        console.log('Attempting sign up with:', { email, role, fullName });
+        
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -39,10 +41,14 @@ export default function AuthForm() {
               full_name: fullName,
               role,
             },
+            emailConfirm: true, // Disable email verification for development
           },
         });
 
+        console.log('Sign up response:', { data, error });
+
         if (error) {
+          console.error('Supabase sign up error:', error);
           throw error;
         }
 
@@ -52,14 +58,36 @@ export default function AuthForm() {
           return;
         }
 
+        // If email verification is disabled in Supabase, try auto-login
+        if (data.user && !data.session) {
+          console.log('No session, attempting auto-login...');
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          
+          console.log('Auto-login response:', { signInData, signInError });
+          
+          if (!signInError && signInData.session) {
+            await ensureUserProfile(supabase, role, fullName, email);
+            router.push(role === 'student' ? '/student' : role === 'admin' ? '/teacher' : '/teacher');
+            return;
+          }
+        }
+
         setMessage('Account created. Please check your email for the confirmation link.');
       } else {
+        console.log('Attempting sign in with:', { email, role });
+        
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
+        console.log('Sign in response:', { data, error });
+
         if (error) {
+          console.error('Supabase sign in error:', error);
           throw error;
         }
 
@@ -68,8 +96,16 @@ export default function AuthForm() {
         router.push(userRole === 'student' ? '/student' : '/teacher');
       }
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Authentication failed.';
-      setMessage(message);
+      console.error('Auth error:', error);
+      
+      let errorMessage = 'Authentication failed.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = JSON.stringify(error);
+      }
+      
+      setMessage(errorMessage);
     } finally {
       setLoading(false);
     }

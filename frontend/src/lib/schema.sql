@@ -179,5 +179,32 @@ alter table public.analytics add column if not exists avg_time_seconds numeric;
 alter table public.analytics add column if not exists heatmap_data jsonb;
 alter table public.analytics add column if not exists event_summary jsonb;
 
+alter table public.students add column if not exists student_number integer unique check (student_number between 1 and 35);
+alter table public.students add column if not exists display_name text;
+alter table public.students add column if not exists passcode text default 'student123';
+alter table public.students add column if not exists is_logged_in boolean default false;
+alter table public.students add column if not exists last_activity_at timestamptz;
+alter table public.students add column if not exists last_login_at timestamptz;
+alter table public.students add column if not exists current_session_id uuid;
+
+-- Seed 35 student records cleanly if missing
+do $$
+declare
+  i integer;
+  u_id uuid;
+begin
+  for i in 1..35 loop
+    if not exists (select 1 from public.students where student_number = i) then
+      insert into public.users (full_name, email, role)
+      values ('Student ' || i, 'student' || i || '@school.internal', 'student')
+      returning id into u_id;
+
+      insert into public.students (user_id, student_id, student_number, display_name, passcode, class_name)
+      values (u_id, 'STU-' || lpad(i::text, 3, '0'), i, 'Student ' || i, 'student123', 'Classroom 1');
+    end if;
+  end loop;
+end $$;
+
 -- Supabase storage bucket (run in Supabase dashboard or via API):
 -- insert into storage.buckets (id, name, public) values ('pdfs', 'pdfs', false);
+

@@ -2,64 +2,66 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <section className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-20 lg:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-full border border-white/10 bg-white/5 px-6 py-3 backdrop-blur">
-          <div className="text-lg font-semibold">ExamGuardian</div>
-          <div className="flex gap-3 text-sm text-slate-300">
-            <Link href="/auth" className="rounded-full border border-white/10 px-4 py-2 transition hover:bg-white/10">
-              Sign in
-            </Link>
-            <Link href="/teacher" className="rounded-full bg-cyan-500 px-4 py-2 font-medium text-slate-950 transition hover:bg-cyan-400">
-              Teacher Dashboard
-            </Link>
+    <main className="relative flex min-h-screen flex-col justify-between bg-slate-50 text-slate-800">
+      {/* Top Header Navigation with Subtle Top-Right Admin Link */}
+      <header className="border-b border-slate-200 bg-white px-6 py-4 shadow-xs">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-4 w-4 rounded-full bg-violet-600" />
+            <span className="text-xl font-normal text-slate-800">ExamGuardian</span>
           </div>
+          <Link
+            href="/admin/login"
+            className="text-xs font-medium text-slate-400 transition hover:text-slate-600"
+          >
+            Admin
+          </Link>
         </div>
+      </header>
 
-        <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-6">
-            <div className="inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-sm text-cyan-300">
-              AI-powered examination monitoring for modern education
-            </div>
-            <h1 className="text-4xl font-semibold tracking-tight sm:text-6xl">
-              Secure exams, smart monitoring, and actionable insight.
+      {/* Main Centered Content Card Area */}
+      <section className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-4 py-12">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
+          {/* Google Forms Top Accent Ribbon */}
+          <div className="h-3 bg-violet-600" />
+          <div className="p-8 text-center sm:p-10">
+            <span className="rounded-full bg-violet-100 px-3.5 py-1 text-xs font-semibold text-violet-700">
+              Institutional Examination Portal
+            </span>
+
+            <h1 className="mt-4 text-3xl font-normal text-slate-800 sm:text-4xl">
+              Student Examination System
             </h1>
-            <p className="max-w-2xl text-lg text-slate-300">
-              ExamGuardian helps schools create intelligent assessments, monitor student behavior in real time, and generate reports that support academic integrity.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Link href="/teacher" className="rounded-full bg-white px-5 py-3 font-medium text-slate-950 transition hover:bg-slate-200">
-                Explore Teacher Tools
-              </Link>
-              <Link href="/student" className="rounded-full border border-white/15 px-5 py-3 font-medium text-white transition hover:bg-white/10">
-                View Student Experience
-              </Link>
-            </div>
-          </div>
 
-          <div className="rounded-3xl border border-white/10 bg-linear-to-br from-cyan-500/20 via-slate-900 to-violet-500/20 p-8 shadow-2xl shadow-cyan-500/10">
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-5">
-                <p className="text-sm uppercase tracking-[0.25em] text-cyan-300">Live exam overview</p>
-                <div className="mt-3 space-y-3 text-sm text-slate-300">
-                  <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                    <span>Active sessions</span>
-                    <span className="font-semibold text-white">24</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                    <span>Flagged students</span>
-                    <span className="font-semibold text-white">3</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                    <span>Reports generated</span>
-                    <span className="font-semibold text-white">12</span>
-                  </div>
-                </div>
-              </div>
+            <p className="mt-4 text-sm text-slate-600">
+              Welcome to the secure assessment platform. Please select your role to proceed to your examination dashboard.
+            </p>
+
+            <div className="mt-8 flex justify-center">
+              <Link
+                href="/student/login"
+                className="w-full max-w-md rounded-lg bg-violet-600 px-8 py-4 text-center text-lg font-medium text-white shadow-md transition hover:bg-violet-700 active:scale-[0.99]"
+              >
+                STUDENT
+              </Link>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Footer with Subtle Bottom-Right Teacher Login Link */}
+      <footer className="border-t border-slate-200 bg-white px-6 py-4">
+        <div className="mx-auto flex max-w-4xl items-center justify-between text-xs text-slate-500">
+          <span>ExamGuardian Assessment Infrastructure</span>
+          <Link
+            href="/auth?role=teacher"
+            className="font-medium text-slate-400 transition hover:text-slate-700 hover:underline"
+          >
+            Teacher Login
+          </Link>
+        </div>
+      </footer>
     </main>
   );
 }
+

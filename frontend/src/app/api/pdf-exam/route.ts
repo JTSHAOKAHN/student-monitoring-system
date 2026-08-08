@@ -1,52 +1,28 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
-import { extractPdfText, generateExamQuestionsFromText } from '@/lib/ai';
+import { generateQuestionsFromFile } from '@/lib/gemini';
+import { getAuthenticatedProfile } from '@/lib/supabase-server';
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
-    if (!file || file.type !== 'application/pdf') {
-      return NextResponse.json({ error: 'A PDF file is required.' }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: 'A file is required.' }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            for (const { name, value, options } of cookiesToSet) {
-              cookieStore.set(name, value, options);
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ error: 'Upload a PDF or image (PNG, JPEG, WebP).' }, { status: 400 });
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('id, role')
-      .eq('auth_user_id', user.id)
-      .maybeSingle();
+    const { supabase, profile, teacher } = await getAuthenticatedProfile();
 
-    if (profileError || !profile || profile.role !== 'teacher') {
-      return NextResponse.json({ error: 'Only teachers can upload PDFs.' }, { status: 403 });
+    if (!profile || profile.role !== 'teacher' || !teacher) {
+      return NextResponse.json({ error: 'Only teachers can upload materials.' }, { status: 401 });
     }
 
-    const extractedText = await extractPdfText(file);
-    const questions = await generateExamQuestionsFromText(extractedText, file.name);
+    const questions = await generateQuestionsFromFile(file, file.name);
 
     const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const storagePath = `pdfs/${fileName}`;
@@ -63,7 +39,7 @@ export async function POST(request: Request) {
     const { data: pdfRow, error: pdfInsertError } = await supabase
       .from('pdf_uploads')
       .insert({
-        teacher_id: profile.id,
+        teacher_id: teacher.id,
         file_name: file.name,
         storage_path: storagePath,
       })
@@ -71,7 +47,7 @@ export async function POST(request: Request) {
       .single();
 
     if (pdfInsertError || !pdfRow) {
-      return NextResponse.json({ error: 'Failed to record uploaded PDF.' }, { status: 400 });
+      return NextResponse.json({ error: 'Failed to record uploaded file.' }, { status: 400 });
     }
 
     const { error: aiError } = await supabase.from('ai_generated_questions').insert({
@@ -86,6 +62,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ questions, pdfId: pdfRow.id });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: 'Failed to process PDF.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to process file.' }, { status: 500 });
   }
 }

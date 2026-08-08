@@ -45,6 +45,8 @@ create table if not exists public.exams (
   teacher_id uuid references public.teachers(id) on delete set null,
   class_id uuid references public.classes(id) on delete set null,
   published boolean default false,
+  duration_minutes integer default 60 check (duration_minutes between 5 and 480),
+  published_at timestamptz,
   created_at timestamptz default now()
 );
 
@@ -52,8 +54,11 @@ create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
   exam_id uuid references public.exams(id) on delete cascade,
   prompt text not null check (length(prompt) between 3 and 2000),
-  question_type text not null check (question_type in ('multiple_choice','essay','true_false','short_answer')),
-  difficulty text default 'medium',
+  question_type text not null check (question_type in ('multiple_choice','essay','true_false','short_answer','fill_blank')),
+  options jsonb,
+  correct_answer text,
+  difficulty text default 'medium' check (difficulty in ('easy','medium','hard')),
+  order_index integer default 0,
   created_at timestamptz default now()
 );
 
@@ -72,7 +77,18 @@ create table if not exists public.attempts (
   status text not null default 'in_progress' check (status in ('in_progress','submitted','abandoned')),
   score numeric check (score between 0 and 100),
   started_at timestamptz default now(),
-  submitted_at timestamptz
+  submitted_at timestamptz,
+  unique (exam_id, student_id)
+);
+
+create table if not exists public.student_responses (
+  id uuid primary key default gen_random_uuid(),
+  attempt_id uuid references public.attempts(id) on delete cascade,
+  question_id uuid references public.questions(id) on delete cascade,
+  response text,
+  is_correct boolean,
+  answered_at timestamptz default now(),
+  unique (attempt_id, question_id)
 );
 
 create table if not exists public.exam_sessions (
@@ -98,10 +114,15 @@ create table if not exists public.analytics (
   id uuid primary key default gen_random_uuid(),
   exam_id uuid references public.exams(id) on delete cascade,
   student_id uuid references public.students(id) on delete cascade,
+  attempt_id uuid references public.attempts(id) on delete cascade,
   focus_score numeric,
   cheating_risk numeric,
   completion_rate numeric,
-  created_at timestamptz default now()
+  avg_time_seconds numeric,
+  heatmap_data jsonb,
+  event_summary jsonb,
+  created_at timestamptz default now(),
+  unique (attempt_id)
 );
 
 create table if not exists public.reports (
@@ -117,6 +138,8 @@ create table if not exists public.notifications (
   user_id uuid references public.users(id) on delete cascade,
   title text not null,
   message text not null,
+  type text default 'general' check (type in ('exam_started','exam_finished','student_flagged','report_generated','weekly_stats','exam_published','general')),
+  link text,
   is_read boolean default false,
   created_at timestamptz default now()
 );
@@ -136,3 +159,25 @@ create table if not exists public.ai_generated_questions (
   content jsonb,
   created_at timestamptz default now()
 );
+
+create index if not exists idx_exams_published on public.exams(published);
+create index if not exists idx_attempts_exam on public.attempts(exam_id);
+create index if not exists idx_monitoring_session on public.monitoring_events(exam_session_id);
+create index if not exists idx_notifications_user on public.notifications(user_id, is_read);
+create index if not exists idx_analytics_exam on public.analytics(exam_id);
+
+-- Migration helpers for existing databases
+alter table public.exams add column if not exists duration_minutes integer default 60;
+alter table public.exams add column if not exists published_at timestamptz;
+alter table public.questions add column if not exists options jsonb;
+alter table public.questions add column if not exists correct_answer text;
+alter table public.questions add column if not exists order_index integer default 0;
+alter table public.notifications add column if not exists type text default 'general';
+alter table public.notifications add column if not exists link text;
+alter table public.analytics add column if not exists attempt_id uuid references public.attempts(id) on delete cascade;
+alter table public.analytics add column if not exists avg_time_seconds numeric;
+alter table public.analytics add column if not exists heatmap_data jsonb;
+alter table public.analytics add column if not exists event_summary jsonb;
+
+-- Supabase storage bucket (run in Supabase dashboard or via API):
+-- insert into storage.buckets (id, name, public) values ('pdfs', 'pdfs', false);

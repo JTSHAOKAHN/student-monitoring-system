@@ -1,0 +1,98 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+
+interface AnalyticsCards {
+  totalExams: number;
+  publishedExams: number;
+  activeSessions: number;
+  avgFocusScore: number;
+  avgCheatingRisk: number;
+  flaggedStudents: number;
+  completionRate: number;
+}
+
+export default function TeacherAnalyticsCards() {
+  const [cards, setCards] = useState<AnalyticsCards | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      const response = await fetch('/api/teacher/analytics');
+      if (response.ok) {
+        const data = await response.json();
+        setCards(data.cards);
+      }
+    }
+    void load();
+  }, []);
+
+  if (!cards) {
+    return <div className="grid gap-4 md:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => (
+      <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-800/50" />
+    ))}</div>;
+  }
+
+  const items = [
+    { title: 'Total exams', value: cards.totalExams, sub: `${cards.publishedExams} published`, color: 'text-cyan-300' },
+    { title: 'Avg focus score', value: `${cards.avgFocusScore}%`, sub: 'Across submissions', color: 'text-emerald-300' },
+    { title: 'Cheating risk', value: `${cards.avgCheatingRisk}%`, sub: `${cards.flaggedStudents} flagged`, color: cards.avgCheatingRisk >= 40 ? 'text-red-300' : 'text-amber-300' },
+    { title: 'Completion rate', value: `${cards.completionRate}%`, sub: `${cards.activeSessions} active now`, color: 'text-violet-300' },
+  ];
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {items.map((item) => (
+        <div key={item.title} className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
+          <p className="text-sm text-slate-400">{item.title}</p>
+          <p className={`mt-2 text-3xl font-semibold ${item.color}`}>{item.value}</p>
+          <p className="mt-1 text-xs text-slate-500">{item.sub}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function TeacherRecentAttempts() {
+  const [attempts, setAttempts] = useState<Array<{ id: string; status: string; score: number | null; exams?: { title: string } }>>([]);
+
+  useEffect(() => {
+    async function load() {
+      const response = await fetch('/api/teacher/analytics');
+      if (response.ok) {
+        const data = await response.json();
+        setAttempts(data.recentAttempts || []);
+      }
+    }
+    void load();
+  }, []);
+
+  if (attempts.length === 0) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+        <h3 className="text-lg font-semibold">Recent attempts</h3>
+        <p className="mt-2 text-sm text-slate-400">No student attempts yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+      <h3 className="text-lg font-semibold">Recent attempts</h3>
+      <ul className="mt-4 space-y-2">
+        {attempts.map((attempt) => (
+          <li key={attempt.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm">
+            <span className="text-slate-300">{attempt.exams?.title || 'Exam'}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-slate-500">{attempt.status}</span>
+              {attempt.score != null && <span className="font-medium text-cyan-300">{attempt.score}%</span>}
+              <Link href={`/teacher/timeline/${attempt.id}`} className="text-cyan-400 hover:underline">
+                Timeline
+              </Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

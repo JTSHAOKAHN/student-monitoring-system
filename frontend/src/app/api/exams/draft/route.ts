@@ -1,58 +1,30 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { notifyStudentsOfPublishedExam } from '@/lib/notifications';
+import { getAuthenticatedProfile } from '@/lib/supabase-server';
+import type { GeneratedQuestion } from '@/lib/types';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, description, questions, pdfId } = body;
+    const { title, description, questions, pdfId, publish } = body as {
+      title: string;
+      description: string;
+      questions: GeneratedQuestion[] | string[];
+      pdfId?: string;
+      publish?: boolean;
+    };
 
     if (!title || !description || !Array.isArray(questions) || questions.length === 0) {
       return NextResponse.json({ error: 'Invalid draft payload.' }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            for (const { name, value, options } of cookiesToSet) {
-              cookieStore.set(name, value, options);
-            }
-          },
-        },
-      }
-    );
+    const { supabase, profile, teacher } = await getAuthenticatedProfile();
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('id, role')
-      .eq('auth_user_id', user.id)
-      .maybeSingle();
-
-    if (profileError || !profile || profile.role !== 'teacher') {
+    if (!profile || profile.role !== 'teacher' || !teacher) {
       return NextResponse.json({ error: 'Only teachers can publish drafts.' }, { status: 403 });
     }
 
-    const { data: teacher, error: teacherError } = await supabase
-      .from('teachers')
-      .select('id')
-      .eq('user_id', profile.id)
-      .maybeSingle();
-
-    if (teacherError || !teacher) {
-      return NextResponse.json({ error: 'Teacher profile missing' }, { status: 400 });
-    }
+    const shouldPublish = publish === true;
 
     const { data: exam, error: examError } = await supabase
       .from('exams')
@@ -60,7 +32,9 @@ export async function POST(request: Request) {
         title,
         description,
         teacher_id: teacher.id,
-        published: false,
+        published: shouldPublish,
+        published_at: shouldPublish ? new Date().toISOString() : null,
+        duration_minutes: 60,
       })
       .select('id')
       .single();
@@ -69,12 +43,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: examError?.message || 'Failed to create exam.' }, { status: 400 });
     }
 
-    const questionRows = questions.map((question: string) => ({
-      exam_id: exam.id,
-      prompt: question,
-      question_type: 'short_answer',
-      difficulty: 'medium',
-    }));
+    const questionRows = questions.map((question, index) => {
+      if (typeof question === 'string') {
+        return {
+          exam_id: exam.id,
+          prompt: question,
+          question_type: 'short_answer',
+          difficulty: 'medium',
+          order_index: index,
+        };
+      }
+
+      return {
+        exam_id: exam.id,
+        prompt: question.prompt,
+        question_type: question.question_type,
+        options: question.options || null,
+        correct_answer: question.correct_answer || null,
+        difficulty: question.difficulty || 'medium',
+        order_index: index,
+      };
+    });
 
     const { error: questionError } = await supabase.from('questions').insert(questionRows);
     if (questionError) {
@@ -85,7 +74,11 @@ export async function POST(request: Request) {
       await supabase.from('ai_generated_questions').update({ exam_id: exam.id }).eq('pdf_upload_id', pdfId);
     }
 
-    return NextResponse.json({ success: true, examId: exam.id });
+    if (shouldPublish) {
+      await notifyStudentsOfPublishedExam(exam.id, title);
+    }
+
+    return NextResponse.json({ success: true, examId: exam.id, published: shouldPublish });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Failed to publish draft.' }, { status: 500 });

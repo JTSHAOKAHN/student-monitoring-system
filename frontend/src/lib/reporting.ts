@@ -69,3 +69,44 @@ export async function getAdminOverview() {
     recentNotifications: notifications || [],
   };
 }
+
+export async function generateExamCsvReport(examId: string): Promise<string> {
+  const supabase = createSupabaseServiceClient();
+  if (!supabase) {
+    return 'Error: Supabase service client not available';
+  }
+
+  const { data: exam } = await supabase.from('exams').select('title').eq('id', examId).single();
+  const { data: attempts } = await supabase
+    .from('attempts')
+    .select('id, status, score, started_at, submitted_at, students(users(full_name, email))')
+    .eq('exam_id', examId);
+
+  const { data: analyticsList } = await supabase
+    .from('analytics')
+    .select('attempt_id, focus_score, cheating_risk, completion_rate, avg_time_seconds')
+    .eq('exam_id', examId);
+
+  const analyticsMap = new Map((analyticsList || []).map((a) => [a.attempt_id, a]));
+
+  const headers = ['Student Name', 'Email', 'Status', 'Score (%)', 'Focus Score (%)', 'Cheating Risk (%)', 'Completion Rate (%)', 'Started At', 'Submitted At'];
+  const rows = (attempts || []).map((att) => {
+    const student = att.students as { users?: { full_name?: string; email?: string } } | null;
+    const stats = analyticsMap.get(att.id);
+
+    return [
+      `"${student?.users?.full_name || 'Student'}"`,
+      `"${student?.users?.email || 'N/A'}"`,
+      att.status,
+      att.score ?? 'N/A',
+      stats?.focus_score ?? 'N/A',
+      stats?.cheating_risk ?? 'N/A',
+      stats?.completion_rate ?? 'N/A',
+      att.started_at ? `"${new Date(att.started_at).toLocaleString()}"` : 'N/A',
+      att.submitted_at ? `"${new Date(att.submitted_at).toLocaleString()}"` : 'N/A',
+    ].join(',');
+  });
+
+  return [`# Exam Report: "${exam?.title || 'Exam'}"`, headers.join(','), ...rows].join('\n');
+}
+

@@ -54,7 +54,7 @@ export default function TeacherAnalyticsCards() {
 }
 
 export function TeacherRecentAttempts() {
-  const [attempts, setAttempts] = useState<Array<{ id: string; status: string; score: number | null; exams?: { title: string } }>>([]);
+  const [attempts, setAttempts] = useState<Array<{ id: string; exam_id?: string; status: string; score: number | null; exams?: { id?: string; title: string } }>>([]);
 
   useEffect(() => {
     async function load() {
@@ -78,21 +78,38 @@ export function TeacherRecentAttempts() {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-      <h3 className="text-lg font-semibold">Recent attempts</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Recent student attempts</h3>
+        <span className="text-xs text-slate-400">Real-time telemetry tracked</span>
+      </div>
       <ul className="mt-4 space-y-2">
-        {attempts.map((attempt) => (
-          <li key={attempt.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm">
-            <span className="text-slate-300">{attempt.exams?.title || 'Exam'}</span>
-            <div className="flex items-center gap-3">
-              <span className="text-slate-500">{attempt.status}</span>
-              {attempt.score != null && <span className="font-medium text-cyan-300">{attempt.score}%</span>}
-              <Link href={`/teacher/timeline/${attempt.id}`} className="text-cyan-400 hover:underline">
-                Timeline
-              </Link>
-            </div>
-          </li>
-        ))}
+        {attempts.map((attempt) => {
+          const eId = attempt.exam_id || attempt.exams?.id;
+          return (
+            <li key={attempt.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm">
+              <span className="font-medium text-slate-200">{attempt.exams?.title || 'Exam'}</span>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs text-slate-400">{attempt.status}</span>
+                {attempt.score != null && <span className="font-semibold text-cyan-300">{attempt.score}%</span>}
+                <Link href={`/teacher/timeline/${attempt.id}`} className="text-xs text-cyan-400 hover:underline">
+                  Timeline
+                </Link>
+                {eId && (
+                  <>
+                    <Link href={`/teacher/live/${eId}`} className="text-xs text-emerald-400 hover:underline">
+                      Live Grid
+                    </Link>
+                    <a href={`/api/teacher/export-report/${eId}`} download className="text-xs text-slate-400 hover:text-white hover:underline">
+                      CSV
+                    </a>
+                  </>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
 }
+

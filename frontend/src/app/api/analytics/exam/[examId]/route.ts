@@ -27,8 +27,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ exa
 
   const { data: attempts } = await supabase
     .from('attempts')
-    .select('id, status, score, submitted_at, students(users(full_name))')
+    .select('id, status, score, started_at, submitted_at, students(users(full_name, email))')
     .eq('exam_id', examId);
 
-  return NextResponse.json({ exam, analytics: analytics || [], attempts: attempts || [] });
+  const analyticsMap: Record<string, any> = {};
+  (analytics || []).forEach((item) => {
+    if (item.attempt_id) {
+      analyticsMap[item.attempt_id] = item;
+    }
+  });
+
+  return NextResponse.json({ exam, analytics: analytics || [], attempts: attempts || [], analyticsMap });
 }
+

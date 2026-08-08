@@ -22,7 +22,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Only teachers can upload materials.' }, { status: 401 });
     }
 
-    const questions = await generateQuestionsFromFile(file, file.name);
+    const count = Number(formData.get('count') || 5);
+    const difficulty = (formData.get('difficulty') as 'easy' | 'medium' | 'hard' | 'mixed') || 'medium';
+    const topicFocus = (formData.get('topicFocus') as string) || '';
+
+    const questions = await generateQuestionsFromFile(file, file.name, {
+      count,
+      difficulty,
+      topicFocus,
+    });
+
 
     const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const storagePath = `pdfs/${fileName}`;

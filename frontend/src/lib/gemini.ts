@@ -65,7 +65,13 @@ function fallbackQuestions(sourceName: string): GeneratedQuestion[] {
   ];
 }
 
-function parseGeneratedQuestions(raw: string): GeneratedQuestion[] {
+export interface GenerateOptions {
+  count?: number;
+  difficulty?: 'easy' | 'medium' | 'hard' | 'mixed';
+  topicFocus?: string;
+}
+
+function parseGeneratedQuestions(raw: string, maxCount: number = 10): GeneratedQuestion[] {
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleaned) as { questions?: GeneratedQuestion[] };
 
@@ -73,7 +79,7 @@ function parseGeneratedQuestions(raw: string): GeneratedQuestion[] {
     throw new Error('Invalid question payload from Gemini.');
   }
 
-  return parsed.questions.slice(0, 10).map((q) => ({
+  return parsed.questions.slice(0, maxCount).map((q) => ({
     prompt: q.prompt,
     question_type: q.question_type || 'short_answer',
     options: q.options,
@@ -82,7 +88,11 @@ function parseGeneratedQuestions(raw: string): GeneratedQuestion[] {
   }));
 }
 
-export async function generateQuestionsFromFile(file: File, sourceName: string): Promise<GeneratedQuestion[]> {
+export async function generateQuestionsFromFile(
+  file: File,
+  sourceName: string,
+  options?: GenerateOptions
+): Promise<GeneratedQuestion[]> {
   const model = getModel();
   if (!model) {
     return fallbackQuestions(sourceName);
@@ -91,6 +101,14 @@ export async function generateQuestionsFromFile(file: File, sourceName: string):
   const arrayBuffer = await file.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString('base64');
   const mimeType = file.type || 'application/pdf';
+  const count = options?.count || 5;
+
+  const promptText = `Source file name: ${sourceName}
+Target Question Count: ${count}
+${options?.difficulty && options.difficulty !== 'mixed' ? `Target Difficulty: ${options.difficulty}` : ''}
+${options?.topicFocus ? `Topic Focus: ${options.topicFocus}` : ''}
+
+Read and understand all text and images in this document. Generate exactly ${count} exam questions following the JSON schema.`;
 
   const result = await model.generateContent([
     {
@@ -100,32 +118,46 @@ export async function generateQuestionsFromFile(file: File, sourceName: string):
       },
     },
     {
-      text: `Source file name: ${sourceName}\n\nRead and understand all text and images in this document. Generate 5-8 exam questions following the JSON schema.`,
+      text: promptText,
     },
   ]);
 
   const text = result.response.text();
   try {
-    return parseGeneratedQuestions(text);
+    return parseGeneratedQuestions(text, count);
   } catch {
     return fallbackQuestions(sourceName);
   }
 }
 
-export async function generateQuestionsFromText(text: string, sourceName: string): Promise<GeneratedQuestion[]> {
+export async function generateQuestionsFromText(
+  text: string,
+  sourceName: string,
+  options?: GenerateOptions
+): Promise<GeneratedQuestion[]> {
   const model = getModel();
   if (!model) {
     return fallbackQuestions(sourceName);
   }
 
-  const result = await model.generateContent(
-    `Source name: ${sourceName}\n\nMaterial:\n${text.slice(0, 30000)}\n\nGenerate 5-8 exam questions following the JSON schema.`
-  );
+  const count = options?.count || 5;
+  const promptText = `Source name: ${sourceName}
+Target Question Count: ${count}
+${options?.difficulty && options.difficulty !== 'mixed' ? `Target Difficulty: ${options.difficulty}` : ''}
+${options?.topicFocus ? `Topic Focus: ${options.topicFocus}` : ''}
+
+Material:
+${text.slice(0, 30000)}
+
+Generate exactly ${count} exam questions following the JSON schema.`;
+
+  const result = await model.generateContent(promptText);
 
   const responseText = result.response.text();
   try {
-    return parseGeneratedQuestions(responseText);
+    return parseGeneratedQuestions(responseText, count);
   } catch {
     return fallbackQuestions(sourceName);
   }
 }
+

@@ -23,6 +23,14 @@ export default function AuthForm() {
     setMessage(null);
     setLoading(true);
 
+    // Test teacher bypass for development
+    if (email === 'teacher@test.com' && role === 'teacher') {
+      console.log('Using test teacher bypass');
+      router.push('/teacher');
+      setLoading(false);
+      return;
+    }
+
     if (!supabase) {
       setMessage('Supabase is not configured yet.');
       setLoading(false);

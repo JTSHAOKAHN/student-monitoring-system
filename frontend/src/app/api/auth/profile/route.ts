@@ -4,12 +4,21 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
-    const { fullName, email, role } = await request.json();
+    const body = await request.json();
+    console.log('Profile API request body:', body);
+    
+    const { fullName, email, role } = body;
     
     const cookieStore = await cookies();
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    console.log('Environment check:', { 
+      hasUrl: !!supabaseUrl, 
+      hasAnonKey: !!supabaseAnonKey, 
+      hasServiceKey: !!supabaseServiceKey 
+    });
 
     if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
@@ -35,6 +44,8 @@ export async function POST(request: Request) {
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
+    console.log('Auth user check:', { user, userError });
+
     if (userError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
@@ -57,12 +68,20 @@ export async function POST(request: Request) {
       email: email?.trim() || user.email || '',
     };
 
+    console.log('Profile payload:', profilePayload);
+
     // Check if profile exists
-    const { data: existingProfile } = await serviceClient
+    const { data: existingProfile, error: selectError } = await serviceClient
       .from('users')
       .select('id')
       .eq('auth_user_id', user.id)
       .maybeSingle();
+
+    console.log('Existing profile check:', { existingProfile, selectError });
+
+    if (selectError) {
+      return NextResponse.json({ error: selectError.message }, { status: 400 });
+    }
 
     if (existingProfile) {
       // Update existing profile
@@ -84,6 +103,8 @@ export async function POST(request: Request) {
       .insert(profilePayload)
       .select('id')
       .single();
+
+    console.log('Profile insert result:', { insertedProfile, insertError });
 
     if (insertError) {
       return NextResponse.json({ error: insertError.message }, { status: 400 });
@@ -114,6 +135,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, profileId: insertedProfile.id });
   } catch (error) {
     console.error('Profile creation error:', error);
-    return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to create profile' }, { status: 500 });
   }
 }

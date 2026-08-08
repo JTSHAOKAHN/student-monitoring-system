@@ -109,7 +109,7 @@ export default function AuthForm() {
         const profileResponse = await fetch('/api/auth/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify { email, role: userRole },
+          body: JSON.stringify({ email, role: userRole }),
         });
 
         if (!profileResponse.ok) {

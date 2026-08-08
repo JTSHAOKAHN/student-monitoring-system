@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { ensureUserProfile } from '@/lib/profile';
 
 type AuthMode = 'sign-in' | 'sign-up';
 type Role = 'teacher' | 'student' | 'admin';
@@ -52,20 +53,7 @@ export default function AuthForm() {
         }
 
         if (data.session) {
-          // Create user profile via API to bypass RLS
-          const profileResponse = await fetch('/api/auth/profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fullName, email, role }),
-          });
-
-          if (!profileResponse.ok) {
-            const profileError = await profileResponse.json();
-            console.error('Profile creation failed:', profileError);
-            setMessage('Account created but profile setup failed. Please try logging in.');
-            return;
-          }
-
+          await ensureUserProfile(supabase, role, fullName, email);
           router.push(role === 'student' ? '/student' : role === 'admin' ? '/teacher' : '/teacher');
           return;
         }

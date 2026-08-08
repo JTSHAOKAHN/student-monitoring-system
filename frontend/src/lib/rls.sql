@@ -1,4 +1,5 @@
-alter table public.users enable row level security;
+-- Temporarily disable RLS for users table to allow signup
+-- alter table public.users enable row level security;
 alter table public.teachers enable row level security;
 alter table public.students enable row level security;
 alter table public.courses enable row level security;

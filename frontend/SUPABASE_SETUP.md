@@ -43,8 +43,28 @@ using (bucket_id = 'pdfs' and auth.role() = 'authenticated');
 
 ## 4. Enable email auth
 
-In **Authentication → Providers**, enable Email and configure redirect URLs for local dev:
+In **Authentication → Providers**, enable Email and configure redirect URLs:
+
+**For local development:**
 - `http://localhost:3000/auth`
+- `http://localhost:3000/**`
+
+**For Vercel deployment:**
+- `https://your-vercel-domain.vercel.app/auth`
+- `https://your-vercel-domain.vercel.app/**`
+
+## 4.5. Disable email verification (for development/testing)
+
+**IMPORTANT FOR TESTING:** To disable email verification during development:
+
+1. In Supabase Dashboard, go to **Authentication → Providers → Email**
+2. Scroll down to **Confirm email** section
+3. **Turn OFF** "Confirm email" 
+4. Click **Save**
+
+This allows teachers to sign up and log in immediately without email verification.
+
+**Remember to re-enable this before production deployment for security.**
 
 ## 5. Other API keys
 

@@ -19,6 +19,8 @@ Before deploying to Vercel, you MUST configure your Supabase project:
 
 ## Step 2: Configure Vercel Environment Variables
 
+**IMPORTANT:** Since your project structure has the Next.js app in the `frontend` folder, Vercel should automatically detect this. If not, make sure to set the "Root Directory" to `frontend` in your Vercel project settings.
+
 In your Vercel project settings, add these environment variables:
 
 ### Required Variables:
@@ -47,7 +49,7 @@ vercel
 1. Push your code to GitHub
 2. Import your repository in Vercel
 3. Vercel will automatically detect the Next.js project
-4. Configure the root directory to be `frontend`
+4. The root directory should be automatically detected as `frontend`
 5. Add environment variables from Step 2
 6. Deploy
 

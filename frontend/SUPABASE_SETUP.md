@@ -16,6 +16,7 @@ Copy `frontend/.env.example` to `frontend/.env.local` and fill in the values.
 In **SQL Editor**, run in order:
 1. `frontend/src/lib/schema.sql`
 2. `frontend/src/lib/rls.sql`
+3. `frontend/src/lib/migration_fix_cascade.sql` (if you have existing PDF uploads)
 
 ## 3. Create storage bucket
 
@@ -73,8 +74,29 @@ This allows teachers to sign up and log in immediately without email verificatio
 | `GEMINI_API_KEY` | AI question generation from PDFs/images |
 | `RESEND_API_KEY` | Email notifications |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Separate admin portal login |
+| `CRON_SECRET_KEY` | PDF cleanup job authentication |
 
-## 6. Run locally
+## 6. PDF Cleanup Job Setup
+
+The system includes an automatic PDF cleanup mechanism that deletes expired PDFs (24 hours after upload).
+
+### Option 1: Use External Cron Service (Recommended for development)
+
+1. Deploy your application to Vercel or another hosting platform
+2. Set up a cron job (cron-job.org, EasyCron, etc.) to call:
+   ```
+   POST https://your-domain.com/api/cleanup/pdfs
+   Headers: Authorization: Bearer YOUR_CRON_SECRET_KEY
+   ```
+3. Set the cron to run every hour
+
+### Option 2: Supabase Edge Function (Production)
+
+1. Deploy the Edge Function from `supabase/functions/pdf-cleanup/index.ts`
+2. Set up a Supabase cron job to trigger it every hour
+3. Configure the `CRON_SECRET_KEY` environment variable
+
+## 7. Run locally
 
 ```bash
 cd frontend

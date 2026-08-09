@@ -2,6 +2,7 @@ import PdfExamComposer from '@/components/PdfExamComposer';
 import ExamCreationForm from '@/components/ExamCreationForm';
 import TeacherAnalyticsCards, { TeacherRecentAttempts } from '@/components/teacher/TeacherAnalyticsCards';
 import NotificationPanel from '@/components/shared/NotificationPanel';
+import PDFManagement from '@/components/PDFManagement';
 import Link from 'next/link';
 
 export default function TeacherDashboardPage() {
@@ -32,6 +33,8 @@ export default function TeacherDashboardPage() {
 
         <TeacherAnalyticsCards />
         <TeacherRecentAttempts />
+
+        <PDFManagement />
 
         <PdfExamComposer />
 

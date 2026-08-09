@@ -11,6 +11,8 @@ export default function PdfExamComposer() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [pdfId, setPdfId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   // Custom AI Generation Controls
   const [count, setCount] = useState(5);
@@ -23,8 +25,20 @@ export default function PdfExamComposer() {
       return;
     }
 
-    if (file.size > 4 * 1024 * 1024) {
-      setMessage('File exceeds 4MB limit. Please upload a smaller PDF or image.');
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+    if (file.size > MAX_FILE_SIZE) {
+      setMessage(`File exceeds 50MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setMessage('Only PDF files are allowed.');
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      setMessage('Invalid file type. Only PDF files are allowed.');
       return;
     }
 
@@ -33,6 +47,7 @@ export default function PdfExamComposer() {
     setDescription(`AI-generated exam based on ${file.name}.`);
     setLoading(true);
     setMessage(null);
+    setUploadProgress(0);
 
     try {
       const formData = new FormData();
@@ -41,10 +56,24 @@ export default function PdfExamComposer() {
       formData.append('difficulty', difficulty);
       formData.append('topicFocus', topicFocus);
 
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
       const response = await fetch('/api/pdf-exam', {
         method: 'POST',
         body: formData,
       });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       const result = await response.json();
       if (!response.ok) {
@@ -53,9 +82,11 @@ export default function PdfExamComposer() {
 
       setQuestions(result.questions || []);
       setPdfId(result.pdfId || null);
+      setExpiresAt(result.expiresAt || null);
       setMessage('✨ AI generated questions! Review, edit, or publish below.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to process the uploaded file.');
+      setUploadProgress(0);
     } finally {
       setLoading(false);
     }
@@ -171,10 +202,29 @@ export default function PdfExamComposer() {
       </div>
 
       <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition hover:border-violet-400 hover:bg-violet-50">
-        <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden" onChange={handleFileChange} />
-        <span className="text-lg font-medium text-slate-700">{loading ? '⚡ Gemini is analyzing document & generating questions...' : '📤 Upload PDF or Image'}</span>
-        <span className="mt-2 text-sm text-slate-500">{fileName || 'Supports PDF, PNG, JPEG, WebP (Max 4MB)'}</span>
+        <input type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
+        <span className="text-lg font-medium text-slate-700">{loading ? '⚡ Processing PDF and generating questions...' : '📤 Upload PDF'}</span>
+        <span className="mt-2 text-sm text-slate-500">{fileName || 'Supports PDF (Max 50MB)'}</span>
+        
+        {uploadProgress > 0 && uploadProgress < 100 && (
+          <div className="mt-4 w-full">
+            <div className="h-2 w-full rounded-full bg-slate-200">
+              <div 
+                className="h-2 rounded-full bg-violet-600 transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            <span className="mt-1 text-xs text-slate-500">Uploading... {uploadProgress}%</span>
+          </div>
+        )}
       </label>
+
+      {expiresAt && (
+        <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3">
+          <p className="text-xs font-medium text-amber-800">⏰ PDF expires: {new Date(expiresAt).toLocaleString()}</p>
+          <p className="text-xs text-amber-600 mt-1">Educational content will be stored permanently</p>
+        </div>
+      )}
 
       {questions.length > 0 && (
         <div className="mt-8 space-y-6">

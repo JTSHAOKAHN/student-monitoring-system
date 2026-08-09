@@ -1,0 +1,9 @@
+{
+  "name": "pdf-cleanup",
+  "version": "1.0.0",
+  "description": "Automatic PDF cleanup function for expired documents",
+  "main": "index.ts",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.4"
+  }
+}

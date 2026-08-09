@@ -26,6 +26,28 @@ JSON schema:
   ]
 }`;
 
+const EXTRACTION_PROMPT = `You are an expert at extracting educational content from PDF documents.
+Your role is to extract and structure the text content from uploaded course materials.
+
+Rules:
+- Extract all meaningful text content from the document
+- Preserve the structure (headings, paragraphs, sections)
+- Identify different content types (headings, body text, tables, code, etc.)
+- Track page numbers when possible
+- Return ONLY valid JSON, no markdown fences
+
+JSON schema:
+{
+  "extracted_content": [
+    {
+      "content": "string",
+      "content_type": "text" | "heading" | "table" | "image_caption" | "code",
+      "page_number": number,
+      "section_title": "string"
+    }
+  ]
+}`;
+
 function getModel() {
   if (!apiKey) {
     return null;
@@ -158,6 +180,69 @@ Generate exactly ${count} exam questions following the JSON schema.`;
     return parseGeneratedQuestions(responseText, count);
   } catch {
     return fallbackQuestions(sourceName);
+  }
+}
+
+export interface ExtractedContent {
+  content: string;
+  content_type: 'text' | 'heading' | 'table' | 'image_caption' | 'code';
+  page_number?: number;
+  section_title?: string;
+}
+
+export async function extractTextFromPDF(
+  file: File,
+  sourceName: string
+): Promise<ExtractedContent[]> {
+  const model = getModel();
+  if (!model) {
+    // Fallback: return basic content
+    return [{
+      content: `Unable to extract text from ${sourceName}. PDF processing not available.`,
+      content_type: 'text',
+      page_number: 1,
+      section_title: 'Error'
+    }];
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString('base64');
+  const mimeType = file.type || 'application/pdf';
+
+  const promptText = `Source file name: ${sourceName}
+
+Extract and structure all text content from this PDF document. Follow the JSON schema for content extraction.`;
+
+  const result = await model.generateContent([
+    {
+      inlineData: {
+        mimeType,
+        data: base64,
+      },
+    },
+    {
+      text: promptText,
+    },
+  ]);
+
+  const text = result.response.text();
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(cleaned) as { extracted_content?: ExtractedContent[] };
+
+    if (!Array.isArray(parsed.extracted_content) || parsed.extracted_content.length === 0) {
+      throw new Error('Invalid extraction payload from Gemini.');
+    }
+
+    return parsed.extracted_content;
+  } catch {
+    // Fallback: return basic content
+    return [{
+      content: `Unable to properly extract structured content from ${sourceName}. Using basic extraction.`,
+      content_type: 'text',
+      page_number: 1,
+      section_title: 'Fallback'
+    }];
   }
 }
 

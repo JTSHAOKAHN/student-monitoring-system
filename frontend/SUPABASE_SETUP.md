@@ -14,9 +14,9 @@ Copy `frontend/.env.example` to `frontend/.env.local` and fill in the values.
 ## 2. Run database schema
 
 In **SQL Editor**, run in order:
-1. `frontend/src/lib/schema.sql`
+1. `frontend/src/lib/schema_fixed.sql` (Fixed version with proper table creation order)
 2. `frontend/src/lib/rls.sql`
-3. `frontend/src/lib/migration_fix_cascade.sql` (if you have existing PDF uploads)
+3. `frontend/src/lib/migration_fix_cascade.sql` (only if you have existing PDF uploads)
 
 ## 3. Create storage bucket
 

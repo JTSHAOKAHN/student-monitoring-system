@@ -55,7 +55,6 @@ export default function AuthForm() {
               full_name: fullName,
               role,
             },
-            emailConfirm: true, // Disable email verification for development
           },
         });
 
@@ -65,6 +64,7 @@ export default function AuthForm() {
 
         if (data.session) {
           await ensureUserProfile(supabase, role, fullName, email);
+          console.log('Signup successful, redirecting to:', role === 'student' ? '/student' : role === 'admin' ? '/teacher' : '/teacher');
           router.push(role === 'student' ? '/student' : role === 'admin' ? '/teacher' : '/teacher');
           return;
         }

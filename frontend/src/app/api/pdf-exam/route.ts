@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { generateQuestionsFromFile, extractTextFromPDF } from '@/lib/gemini';
 import { createClient } from '@supabase/supabase-js';
+import { writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const ALLOWED_MIME_TYPES = ['application/pdf'];
@@ -42,7 +45,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File is empty.' }, { status: 400 });
     }
 
-    // TEMPORARY: Use service client for testing
+    // Use local file storage
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    
+    // Ensure uploads directory exists
+    if (!existsSync(uploadsDir)) {
+      await mkdir(uploadsDir, { recursive: true });
+    }
+
+    // Generate unique filename
+    const fileName = `teacher-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    // Convert file to buffer and save locally
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    await writeFile(filePath, buffer);
+
+    // Database connection for metadata
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -54,35 +74,14 @@ export async function POST(request: Request) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // TEMPORARY: Skip authentication for testing
-    // In production, restore proper authentication
-
     const count = Number(formData.get('count') || 5);
     const difficulty = (formData.get('difficulty') as 'easy' | 'medium' | 'hard' | 'mixed') || 'medium';
     const topicFocus = (formData.get('topicFocus') as string) || '';
 
     // Update processing status to 'processing'
     const processingStartTime = new Date();
-    
-    // Generate unique storage path with teacher ID for organization
-    const fileName = `teacher-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const storagePath = `pdfs/${fileName}`;
 
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage.from('pdfs').upload(storagePath, file, {
-      cacheControl: '3600',
-      upsert: false,
-    });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      return NextResponse.json({ 
-        error: 'Failed to upload file to storage.',
-        details: uploadError.message 
-      }, { status: 500 });
-    }
-
-    // Insert PDF record with full metadata and expiration
+    // Insert PDF record with local file path and expiration
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24); // 24 hours from now
 
@@ -95,7 +94,7 @@ export async function POST(request: Request) {
       .insert({
         teacher_id: teacherId,
         file_name: file.name,
-        storage_path: storagePath,
+        storage_path: fileName, // Local file path instead of storage path
         file_size: file.size,
         mime_type: file.type,
         uploaded_at: processingStartTime.toISOString(),
@@ -109,7 +108,7 @@ export async function POST(request: Request) {
     if (pdfInsertError || !pdfRow) {
       console.error('PDF record insert error:', pdfInsertError);
       // Clean up uploaded file if database insert fails
-      await supabase.storage.from('pdfs').remove([storagePath]);
+      // Note: In production you'd want to delete the local file here
       return NextResponse.json({ 
         error: 'Failed to record uploaded file in database.',
         details: pdfInsertError?.message 
@@ -203,7 +202,7 @@ export async function POST(request: Request) {
         pdfId: pdfRow.id,
         expiresAt: expiresAt.toISOString(),
         extractedContentCount: extractedContent.length,
-        message: 'PDF processed successfully. Content extracted and stored permanently.'
+        message: 'PDF processed successfully. Content extracted and stored permanently using local storage.'
       });
     } catch (processingError) {
       console.error('PDF processing error:', processingError);

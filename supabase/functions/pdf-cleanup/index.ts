@@ -72,7 +72,7 @@ serve(async (req) => {
 
         // Delete from Supabase Storage
         const { error: storageError } = await supabase.storage
-          .from('pdfs')
+          .from('exam-pdfs')
           .remove([pdf.storage_path]);
 
         if (storageError) {

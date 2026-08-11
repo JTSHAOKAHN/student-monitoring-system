@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     // Download PDF from storage
     const { data: fileData, error: downloadError } = await supabase.storage
-      .from('pdfs')
+      .from('exam-pdfs')
       .download(pdfRecord.storage_path);
 
     if (downloadError || !fileData) {

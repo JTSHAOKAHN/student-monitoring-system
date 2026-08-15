@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import NotificationPanel from '@/components/shared/NotificationPanel';
 import StudentStudyTool from '@/components/StudentStudyTool';
 import type { StudentExamSummary } from '@/lib/types';
 
@@ -65,7 +64,6 @@ export default function StudentDashboard() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <NotificationPanel />
             <button
               onClick={handleLogout}
               disabled={loggingOut}

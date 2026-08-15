@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import NotificationPanel from '@/components/shared/NotificationPanel';
+import StudentStudyTool from '@/components/StudentStudyTool';
 import type { StudentExamSummary } from '@/lib/types';
 
 export default function StudentDashboard() {
@@ -80,6 +81,10 @@ export default function StudentDashboard() {
         <section className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-medium text-slate-800">Available Exams</h2>
           <p className="mt-1 text-sm text-slate-500">Select an exam to begin. Your activity will be monitored during the session.</p>
+        </section>
+
+        <section className="mb-8">
+          <StudentStudyTool />
         </section>
 
         {loading && (

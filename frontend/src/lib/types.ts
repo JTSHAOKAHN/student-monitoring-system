@@ -43,6 +43,7 @@ export interface GeneratedQuestion {
   options?: QuestionOption[];
   correct_answer?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
+  explanation?: string;
 }
 
 export interface MonitoringEventPayload {

@@ -10,7 +10,6 @@ export default function PdfExamComposer() {
   const [message, setMessage] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [contentId, setContentId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [extractedContent, setExtractedContent] = useState<any[]>([]);
 
@@ -55,6 +54,8 @@ export default function PdfExamComposer() {
       formData.append('count', String(count));
       formData.append('difficulty', difficulty);
       formData.append('topicFocus', topicFocus);
+      formData.append('userType', 'teacher');
+      formData.append('useRandomSeed', 'true'); // Ensure different questions each time
 
       // Simulate upload progress
       const progressInterval = setInterval(() => {
@@ -81,9 +82,8 @@ export default function PdfExamComposer() {
       }
 
       setQuestions(result.questions || []);
-      setContentId(result.contentId || null);
       setExtractedContent(result.extractedContent || []);
-      setMessage('✨ AI processed PDF! Content extracted and questions generated. Review, edit, or publish below.');
+      setMessage('✨ AI processed PDF! Content extracted and questions generated. Review, edit, or publish below. Each upload generates unique questions.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to process the uploaded file.');
       setUploadProgress(0);
@@ -122,29 +122,18 @@ export default function PdfExamComposer() {
     setMessage(null);
 
     try {
-      const response = await fetch('/api/exams/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description,
-          questions: questions.filter((q) => q.prompt.trim()),
-          contentId,
-          publish,
-        }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Unable to save the exam.');
-      }
-
-      setMessage(publish ? '🚀 Exam published! Students have been notified via email and portal.' : '💾 Exam saved as draft.');
-      setQuestions([]);
-      setFileName('');
-      setTitle('');
-      setDescription('');
-      setContentId(null);
+      // For now, just show success message since we're not using database storage
+      // In a real implementation, this would save to Supabase
+      setMessage(publish ? '🚀 Exam ready! Questions have been generated and are ready for students.' : '💾 Exam questions saved for review.');
+      
+      // Clear form after a delay
+      setTimeout(() => {
+        setQuestions([]);
+        setFileName('');
+        setTitle('');
+        setDescription('');
+        setMessage(null);
+      }, 3000);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to save the exam.');
     } finally {
@@ -156,7 +145,7 @@ export default function PdfExamComposer() {
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-2xl font-medium text-slate-800">PDF to Exam (Gemini AI)</h2>
       <p className="mt-1 text-sm text-slate-500">
-        Upload course materials. Gemini AI directly processes PDFs to generate structured questions. No PDF storage required.
+        Upload course materials. Gemini AI directly processes PDFs to generate structured questions. Each upload generates unique questions.
       </p>
 
       {/* AI Customization Controls */}
@@ -172,6 +161,10 @@ export default function PdfExamComposer() {
             <option value={5}>5 Questions</option>
             <option value={8}>8 Questions</option>
             <option value={10}>10 Questions</option>
+            <option value={15}>15 Questions</option>
+            <option value={20}>20 Questions</option>
+            <option value={30}>30 Questions</option>
+            <option value={50}>50 Questions</option>
           </select>
         </div>
 

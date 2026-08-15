@@ -26,10 +26,10 @@ JSON schema:
   ]
 }`;
 
-const COMBINED_PROMPT = `You are an expert at processing educational PDF documents for exam creation.
+const COMBINED_PROMPT = `You are an expert at processing educational PDF documents for exam creation and study tools.
 Your role is to:
 1. Extract and structure the text content from the uploaded PDF
-2. Generate high-quality exam questions based on the extracted content
+2. Generate high-quality questions based on the extracted content
 
 Rules:
 - Extract all meaningful text content from the document
@@ -63,16 +63,64 @@ JSON schema:
   ]
 }`;
 
+const STUDY_PROMPT = `You are an expert at creating study materials and practice questions from educational PDFs.
+Your role is to:
+1. Extract and structure the text content from the uploaded PDF
+2. Generate practice questions for self-study
+3. Identify areas where students typically need more focus
+
+Rules:
+- Extract all meaningful text content from the document
+- Preserve the structure (headings, paragraphs, sections)
+- Identify different content types (headings, body text, tables, code, etc.)
+- Track page numbers when possible
+- Create practice questions suitable for self-study
+- Mix question types: multiple_choice, true_false, short_answer, and fill_blank
+- For multiple_choice, provide exactly 4 options with one correct answer
+- Questions must be grounded in the extracted material
+- Include detailed explanations for answers
+- Identify study focus areas based on content complexity
+- Return ONLY valid JSON, no markdown fences
+
+JSON schema:
+{
+  "extractedContent": [
+    {
+      "content": "string",
+      "content_type": "text" | "heading" | "table" | "image_caption" | "code",
+      "page_number": number,
+      "section_title": "string"
+    }
+  ],
+  "questions": [
+    {
+      "prompt": "string",
+      "question_type": "multiple_choice" | "true_false" | "short_answer" | "fill_blank",
+      "options": [{ "id": "a", "label": "string" }, ...],
+      "correct_answer": "string",
+      "explanation": "string",
+      "difficulty": "easy" | "medium" | "hard"
+    }
+  ],
+  "studyFocusAreas": [
+    {
+      "topic": "string",
+      "reason": "string",
+      "suggestedStudyTime": "string"
+    }
+  ]
+}`;
 
 
-function getModel() {
+
+function getModel(userType: 'teacher' | 'student' = 'teacher') {
   if (!apiKey) {
     return null;
   }
   const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    systemInstruction: COMBINED_PROMPT,
+    model: 'gemini-3.5-flash',
+    systemInstruction: userType === 'student' ? STUDY_PROMPT : COMBINED_PROMPT,
   });
 }
 
@@ -108,6 +156,8 @@ export interface GenerateOptions {
   count?: number;
   difficulty?: 'easy' | 'medium' | 'hard' | 'mixed';
   topicFocus?: string;
+  userType?: 'teacher' | 'student';
+  useRandomSeed?: boolean;
 }
 
 function parseGeneratedQuestions(raw: string, maxCount: number = 10): GeneratedQuestion[] {
@@ -210,6 +260,13 @@ export interface ExtractedContent {
 export interface GeminiProcessingResult {
   extractedContent: ExtractedContent[];
   questions: GeneratedQuestion[];
+  studyFocusAreas?: StudyFocusArea[];
+}
+
+export interface StudyFocusArea {
+  topic: string;
+  reason: string;
+  suggestedStudyTime: string;
 }
 
 export async function processPDFWithGemini(
@@ -217,7 +274,8 @@ export async function processPDFWithGemini(
   sourceName: string,
   options?: GenerateOptions
 ): Promise<GeminiProcessingResult> {
-  const model = getModel();
+  const userType = options?.userType || 'teacher';
+  const model = getModel(userType);
   if (!model) {
     return {
       extractedContent: [{
@@ -235,15 +293,21 @@ export async function processPDFWithGemini(
   const mimeType = file.type || 'application/pdf';
   const count = options?.count || 5;
 
+  // Add random seed to ensure different questions for same PDF
+  const randomSeed = options?.useRandomSeed ? Math.random().toString(36).substring(7) : '';
+  const seedInstruction = randomSeed ? `Random Seed: ${randomSeed} - Generate unique questions based on this seed.` : '';
+
   const promptText = `Source file name: ${sourceName}
+User Type: ${userType}
 Target Question Count: ${count}
 ${options?.difficulty && options.difficulty !== 'mixed' ? `Target Difficulty: ${options.difficulty}` : ''}
 ${options?.topicFocus ? `Topic Focus: ${options.topicFocus}` : ''}
+${seedInstruction}
 
-Process this PDF document:
-1. Extract and structure all text content
-2. Generate exactly ${count} exam questions based on the content
-Return both extracted content and questions following the JSON schema where the extracted content is under the key "extractedContent".`;
+${userType === 'student' 
+  ? 'Process this PDF document for study purposes: 1. Extract and structure all text content 2. Generate practice questions with explanations 3. Identify study focus areas. Return both extracted content, questions with explanations, and study focus areas following the JSON schema.'
+  : 'Process this PDF document: 1. Extract and structure all text content 2. Generate exactly ${count} exam questions based on the content. Return both extracted content and questions following the JSON schema where the extracted content is under the key "extractedContent".'
+}`;
 
   const result = await model.generateContent([
     {
@@ -260,7 +324,11 @@ Return both extracted content and questions following the JSON schema where the 
   const text = result.response.text();
   try {
     const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned) as { extractedContent?: ExtractedContent[]; questions?: GeneratedQuestion[] };
+    const parsed = JSON.parse(cleaned) as { 
+      extractedContent?: ExtractedContent[]; 
+      questions?: GeneratedQuestion[];
+      studyFocusAreas?: StudyFocusArea[];
+    };
 
     // Validate and provide fallbacks if needed
     const extractedContent = Array.isArray(parsed.extractedContent) && parsed.extractedContent.length > 0 
@@ -276,9 +344,14 @@ Return both extracted content and questions following the JSON schema where the 
       ? parsed.questions
       : fallbackQuestions(sourceName);
 
+    const studyFocusAreas = userType === 'student' && Array.isArray(parsed.studyFocusAreas)
+      ? parsed.studyFocusAreas
+      : undefined;
+
     return {
       extractedContent,
-      questions: processedQuestions
+      questions: processedQuestions,
+      studyFocusAreas
     };
   } catch {
     return {

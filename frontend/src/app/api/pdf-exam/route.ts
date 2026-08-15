@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { processPDFWithGemini } from '@/lib/gemini';
-import { createClient } from '@supabase/supabase-js';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const ALLOWED_MIME_TYPES = ['application/pdf'];
@@ -42,80 +41,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File is empty.' }, { status: 400 });
     }
 
-    // TEMPORARY: Use service client for testing
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    // TEMPORARY: Use a default teacher ID for testing
-    const { data: teacherData } = await supabase.from('teachers').select('id').limit(1).maybeSingle();
-    const teacherId = teacherData?.id || '00000000-0000-0000-0000-000000000000';
-
     const count = Number(formData.get('count') || 5);
     const difficulty = (formData.get('difficulty') as 'easy' | 'medium' | 'hard' | 'mixed') || 'medium';
     const topicFocus = (formData.get('topicFocus') as string) || '';
+    const userType = (formData.get('userType') as 'teacher' | 'student') || 'teacher';
+    const useRandomSeed = formData.get('useRandomSeed') === 'true';
+
+    // Validate question count (1-50)
+    if (count < 1 || count > 50) {
+      return NextResponse.json({ 
+        error: 'Question count must be between 1 and 50.',
+        details: `Requested: ${count}, Maximum: 50`
+      }, { status: 400 });
+    }
 
     // Process PDF directly with Gemini (no storage needed)
     const processingStartTime = new Date();
     
-    const { extractedContent, questions } = await processPDFWithGemini(file, file.name, {
+    const { extractedContent, questions, studyFocusAreas } = await processPDFWithGemini(file, file.name, {
       count,
       difficulty,
       topicFocus,
+      userType,
+      useRandomSeed,
     });
 
-    // Create a simple content record for tracking (no PDF storage)
-    const { data: contentRow, error: contentInsertError } = await supabase
-      .from('extracted_content')
-      .insert({
-        source_document_id: null, // No PDF document needed
-        content: `Generated from ${file.name} via Gemini AI`,
-        content_type: 'text',
-        page_number: 1,
-        section_title: 'AI Generated',
-      })
-      .select('id')
-      .single();
-
-    if (contentInsertError) {
-      console.error('Failed to insert content record:', contentInsertError);
-    }
-
-    // Store questions in question bank permanently
-    const questionBankInserts = questions.map((q, index) => ({
-      created_by: teacherId,
-      source_content_id: contentRow?.id || null,
-      source_document_id: null, // No PDF document needed
-      question_text: q.prompt,
-      question_type: q.question_type,
-      options: q.options,
-      correct_answer: q.correct_answer,
-      difficulty: q.difficulty,
-      source_page_number: 1,
-      source_section: 'AI Generated',
-    }));
-
-    const { error: questionBankError } = await supabase
-      .from('question_bank')
-      .insert(questionBankInserts);
-
-    if (questionBankError) {
-      console.error('Failed to insert questions to bank:', questionBankError);
-    }
-
+    // In Gemini-first approach, we don't need database storage
+    // Just return the processed content directly
+    
     return NextResponse.json({ 
       questions, 
       extractedContent,
-      contentId: contentRow?.id || null,
-      message: 'PDF processed successfully via Gemini AI. Questions generated and stored permanently without PDF storage.',
-      processingTime: `${Date.now() - processingStartTime.getTime()}ms`
+      studyFocusAreas,
+      message: userType === 'student' 
+        ? 'PDF processed successfully via Gemini AI. Practice questions with explanations and study focus areas generated for self-study.'
+        : 'PDF processed successfully via Gemini AI. Questions generated and ready for review.',
+      processingTime: `${Date.now() - processingStartTime.getTime()}ms`,
+      userType,
+      fileName: file.name
     });
   } catch (error) {
     console.error('Unexpected error:', error);

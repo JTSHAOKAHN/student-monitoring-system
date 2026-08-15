@@ -27,11 +27,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Log login event
+    // Log login event (without user_id since column doesn't exist)
     const { error: logError } = await serviceClient.from('monitoring_events').insert({
-      user_id: user.id,
       event_type: 'login',
-      details: { email, role, timestamp: new Date().toISOString() },
+      details: { user_name: user.full_name, user_role: user.role, email, timestamp: new Date().toISOString() },
     });
 
     if (logError) {

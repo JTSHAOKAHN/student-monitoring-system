@@ -28,7 +28,7 @@ interface LoginActivity {
 
 export default function AdminPortal() {
   const router = useRouter();
-  const [view, setView] = useState<'overview' | 'users' | 'exams' | 'notifications' | 'activity'>('overview');
+  const [view, setView] = useState<'overview' | 'users' | 'exams' | 'notifications' | 'activity' | 'system'>('overview');
   const [stats, setStats] = useState({ users: 0, teachers: 0, students: 0, exams: 0, attempts: 0, flagged: 0, active_sessions: 0 });
   const [activity, setActivity] = useState<Array<{ title: string; detail: string }>>([]);
   const [loginActivity, setLoginActivity] = useState<LoginActivity[]>([]);
@@ -171,6 +171,74 @@ export default function AdminPortal() {
       );
     }
 
+    if (view === 'system') {
+      return (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h2 className="text-xl font-medium text-slate-800">System Information</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Environment</span>
+                <span className="font-medium text-slate-800">Development</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Database</span>
+                <span className="font-medium text-slate-800">Supabase</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">AI Provider</span>
+                <span className="font-medium text-slate-800">Google Gemini</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Frontend</span>
+                <span className="font-medium text-slate-800">Next.js 16.3.0</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h2 className="text-xl font-medium text-slate-800">Portal Status</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Student Portal</span>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">Operational</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Teacher Portal</span>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">Operational</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Admin Portal</span>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">Operational</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h2 className="text-xl font-medium text-slate-800">Recent Features</h2>
+            <ul className="mt-4 space-y-2 text-sm text-slate-600">
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span>Gemini AI PDF processing for exam generation</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span>Student Study Tool with practice questions</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span>Custom student session authentication</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span>Schema compatibility for existing database</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -226,7 +294,7 @@ export default function AdminPortal() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {(['overview', 'users', 'exams', 'notifications', 'activity'] as const).map((tab) => (
+          {(['overview', 'users', 'exams', 'notifications', 'activity', 'system'] as const).map((tab) => (
             <button
               key={tab}
               type="button"

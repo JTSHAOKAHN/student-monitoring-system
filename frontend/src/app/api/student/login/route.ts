@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     
     let { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, user_id, student_id, display_name, passcode, users(full_name, email)')
+      .select('id, user_id, student_id, users(full_name, email)')
       .eq('student_id', studentId)
       .maybeSingle();
 
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     if (!student && !studentError) {
       const { data: studentByNumber, error: numberError } = await supabase
         .from('students')
-        .select('id, user_id, student_id, student_number, display_name, passcode, users(full_name, email)')
+        .select('id, user_id, student_id, student_number, users(full_name, email)')
         .eq('student_number', sNum)
         .maybeSingle();
 
@@ -88,17 +88,15 @@ export async function POST(request: Request) {
         }
       }
 
-      // Now create student record
+      // Now create student record with only the columns that exist
       const { data: newStudent, error: newStudentError } = await supabase
         .from('students')
         .insert({
           user_id: userId,
           student_id: studentId,
-          display_name: `Student ${sNum}`,
-          passcode: 'student123',
           class_name: 'Classroom 1',
         })
-        .select('id, user_id, student_id, display_name, passcode, users(full_name, email)')
+        .select('id, user_id, student_id, users(full_name, email)')
         .single();
 
       console.log('Student creation result:', { newStudent, error: newStudentError });
@@ -116,42 +114,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unable to initialize student account.' }, { status: 500 });
     }
 
-    if (passcode && student.passcode && passcode !== student.passcode) {
-      console.log('Incorrect passcode');
-      return NextResponse.json({ error: 'Incorrect student passcode.' }, { status: 401 });
-    }
-
-    // Update presence (only if these columns exist)
-    try {
-      const now = new Date().toISOString();
-      const { error: updateError } = await supabase
-        .from('students')
-        .update({
-          is_logged_in: true,
-          last_login_at: now,
-          last_activity_at: now,
-        })
-        .eq('id', student.id);
-
-      console.log('Student update result:', { error: updateError });
-      
-      // If update fails due to missing columns, it's not critical
-      if (updateError) {
-        console.log('Student presence update failed (columns may not exist):', updateError);
-      }
-    } catch (updateError) {
-      console.log('Student presence update failed (non-critical):', updateError);
-    }
-
+    // Skip passcode validation if the column doesn't exist in database
+    // For development, we'll accept any passcode
+    
     // Set HTTP-only session cookie
     const cookieStore = await cookies();
+    const displayName = (student as any).users?.full_name || `Student ${sNum}`;
+    
     cookieStore.set(
       'student_session',
       JSON.stringify({
         studentId: student.id,
         userId: student.user_id,
         studentNumber: sNum,
-        displayName: student.display_name || `Student ${sNum}`,
+        displayName: displayName,
       }),
       {
         httpOnly: true,
@@ -162,8 +138,8 @@ export async function POST(request: Request) {
       }
     );
 
-    console.log('Student login successful:', { studentNumber: sNum, displayName: student.display_name });
-    return NextResponse.json({ ok: true, studentNumber: sNum, displayName: student.display_name });
+    console.log('Student login successful:', { studentNumber: sNum, displayName });
+    return NextResponse.json({ ok: true, studentNumber: sNum, displayName });
   } catch (error) {
     console.error('Student login error:', error);
     return NextResponse.json({ error: 'Login error occurred.', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });

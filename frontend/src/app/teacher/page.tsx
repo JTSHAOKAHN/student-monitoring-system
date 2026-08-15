@@ -2,7 +2,6 @@ import PdfExamComposer from '@/components/PdfExamComposer';
 import ExamCreationForm from '@/components/ExamCreationForm';
 import TeacherAnalyticsCards, { TeacherRecentAttempts } from '@/components/teacher/TeacherAnalyticsCards';
 import NotificationPanel from '@/components/shared/NotificationPanel';
-import PDFManagement from '@/components/PDFManagement';
 import Link from 'next/link';
 
 export default function TeacherDashboardPage() {
@@ -14,7 +13,7 @@ export default function TeacherDashboardPage() {
             <p className="text-xs font-medium uppercase tracking-widest text-violet-600">Teacher Dashboard</p>
             <h1 className="mt-2 text-3xl font-normal text-slate-800">Exam Management & Analytics</h1>
             <p className="mt-3 max-w-2xl text-sm text-slate-600">
-              Create AI-assisted exams from PDFs or images, publish to students, and monitor session analytics in real time.
+              Create AI-assisted exams directly from PDFs using Gemini AI. Upload PDFs, process with AI, and publish to students.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -33,8 +32,6 @@ export default function TeacherDashboardPage() {
 
         <TeacherAnalyticsCards />
         <TeacherRecentAttempts />
-
-        <PDFManagement />
 
         <PdfExamComposer />
 

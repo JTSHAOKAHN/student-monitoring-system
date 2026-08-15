@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { generateQuestionsFromFile, extractTextFromPDF } from '@/lib/gemini';
+import { processPDFWithGemini } from '@/lib/gemini';
 import { createClient } from '@supabase/supabase-js';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -62,162 +62,61 @@ export async function POST(request: Request) {
     const difficulty = (formData.get('difficulty') as 'easy' | 'medium' | 'hard' | 'mixed') || 'medium';
     const topicFocus = (formData.get('topicFocus') as string) || '';
 
-    // Generate unique storage path
-    const documentId = crypto.randomUUID();
-    const fileName = `${teacherId}/${documentId}/${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const storagePath = `exam-pdfs/${fileName}`;
-
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage.from('exam-pdfs').upload(storagePath, file, {
-      cacheControl: '3600',
-      upsert: false,
+    // Process PDF directly with Gemini (no storage needed)
+    const processingStartTime = new Date();
+    
+    const { extractedContent, questions } = await processPDFWithGemini(file, file.name, {
+      count,
+      difficulty,
+      topicFocus,
     });
 
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      return NextResponse.json({ 
-        error: 'Failed to upload file to storage.',
-        details: uploadError.message 
-      }, { status: 500 });
-    }
-
-    // Create PDF record with full metadata and expiration
-    const processingStartTime = new Date();
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24); // 24 hours from now
-
-    const { data: pdfRow, error: pdfInsertError } = await supabase
-      .from('pdf_uploads')
+    // Create a simple content record for tracking (no PDF storage)
+    const { data: contentRow, error: contentInsertError } = await supabase
+      .from('extracted_content')
       .insert({
-        teacher_id: teacherId,
-        file_name: file.name,
-        storage_path: storagePath,
-        file_size: file.size,
-        mime_type: file.type,
-        uploaded_at: processingStartTime.toISOString(),
-        expires_at: expiresAt.toISOString(),
-        processing_status: 'processing',
-        extraction_status: 'in_progress',
+        source_document_id: null, // No PDF document needed
+        content: `Generated from ${file.name} via Gemini AI`,
+        content_type: 'text',
+        page_number: 1,
+        section_title: 'AI Generated',
       })
       .select('id')
       .single();
 
-    if (pdfInsertError || !pdfRow) {
-      console.error('PDF record insert error:', pdfInsertError);
-      // Clean up uploaded file if database insert fails
-      await supabase.storage.from('exam-pdfs').remove([storagePath]);
-      return NextResponse.json({ 
-        error: 'Failed to record uploaded file in database.',
-        details: pdfInsertError?.message 
-      }, { status: 500 });
+    if (contentInsertError) {
+      console.error('Failed to insert content record:', contentInsertError);
     }
 
-    try {
-      // Step 1: Extract text content permanently
-      await supabase
-        .from('pdf_uploads')
-        .update({ processing_status: 'extracting' })
-        .eq('id', pdfRow.id);
+    // Store questions in question bank permanently
+    const questionBankInserts = questions.map((q, index) => ({
+      created_by: teacherId,
+      source_content_id: contentRow?.id || null,
+      source_document_id: null, // No PDF document needed
+      question_text: q.prompt,
+      question_type: q.question_type,
+      options: q.options,
+      correct_answer: q.correct_answer,
+      difficulty: q.difficulty,
+      source_page_number: 1,
+      source_section: 'AI Generated',
+    }));
 
-      const extractedContent = await extractTextFromPDF(file, file.name);
+    const { error: questionBankError } = await supabase
+      .from('question_bank')
+      .insert(questionBankInserts);
 
-      // Store extracted content permanently
-      const contentInserts = extractedContent.map(content => ({
-        source_document_id: pdfRow.id,
-        content: content.content,
-        content_type: content.content_type,
-        page_number: content.page_number,
-        section_title: content.section_title,
-      }));
-
-      const { error: contentInsertError } = await supabase
-        .from('extracted_content')
-        .insert(contentInserts);
-
-      if (contentInsertError) {
-        console.error('Failed to insert extracted content:', contentInsertError);
-        // Continue processing, but log the error
-      }
-
-      // Update extraction status
-      await supabase
-        .from('pdf_uploads')
-        .update({ 
-          extraction_status: 'completed',
-          processing_status: 'generating_questions'
-        })
-        .eq('id', pdfRow.id);
-
-      // Step 2: Generate questions from extracted content
-      const questions = await generateQuestionsFromFile(file, file.name, {
-        count,
-        difficulty,
-        topicFocus,
-      });
-
-      // Store questions in question bank permanently
-      const questionBankInserts = questions.map((q, index) => ({
-        created_by: teacherId,
-        source_document_id: pdfRow.id,
-        question_text: q.prompt,
-        question_type: q.question_type,
-        options: q.options,
-        correct_answer: q.correct_answer,
-        difficulty: q.difficulty,
-        source_page_number: extractedContent[0]?.page_number,
-        source_section: extractedContent[0]?.section_title,
-      }));
-
-      const { error: questionBankError } = await supabase
-        .from('question_bank')
-        .insert(questionBankInserts);
-
-      if (questionBankError) {
-        console.error('Failed to insert questions to bank:', questionBankError);
-        // Continue with AI generated questions as fallback
-      }
-
-      // Store AI generated questions (with set null instead of cascade)
-      const { error: aiError } = await supabase.from('ai_generated_questions').insert({
-        pdf_upload_id: pdfRow.id,
-        content: { questions },
-      });
-
-      if (aiError) {
-        console.error('AI questions insert error:', aiError);
-        // Don't fail the whole process, just log the error
-      }
-
-      // Update status to 'ready'
-      await supabase
-        .from('pdf_uploads')
-        .update({ processing_status: 'ready' })
-        .eq('id', pdfRow.id);
-
-      return NextResponse.json({ 
-        questions, 
-        pdfId: pdfRow.id,
-        expiresAt: expiresAt.toISOString(),
-        extractedContentCount: extractedContent.length,
-        message: 'PDF processed successfully. Content extracted and stored permanently.'
-      });
-    } catch (processingError) {
-      console.error('PDF processing error:', processingError);
-      
-      // Update status to 'failed'
-      await supabase
-        .from('pdf_uploads')
-        .update({ 
-          processing_status: 'failed',
-          extraction_status: 'failed'
-        })
-        .eq('id', pdfRow.id);
-
-      return NextResponse.json({ 
-        error: 'Failed to process PDF file.',
-        details: processingError instanceof Error ? processingError.message : 'Unknown error'
-      }, { status: 500 });
+    if (questionBankError) {
+      console.error('Failed to insert questions to bank:', questionBankError);
     }
+
+    return NextResponse.json({ 
+      questions, 
+      extractedContent,
+      contentId: contentRow?.id || null,
+      message: 'PDF processed successfully via Gemini AI. Questions generated and stored permanently without PDF storage.',
+      processingTime: `${Date.now() - processingStartTime.getTime()}ms`
+    });
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json({ 

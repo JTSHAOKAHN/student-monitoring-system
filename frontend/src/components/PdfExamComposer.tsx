@@ -10,9 +10,9 @@ export default function PdfExamComposer() {
   const [message, setMessage] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [pdfId, setPdfId] = useState<string | null>(null);
+  const [contentId, setContentId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [extractedContent, setExtractedContent] = useState<any[]>([]);
 
   // Custom AI Generation Controls
   const [count, setCount] = useState(5);
@@ -81,9 +81,9 @@ export default function PdfExamComposer() {
       }
 
       setQuestions(result.questions || []);
-      setPdfId(result.pdfId || null);
-      setExpiresAt(result.expiresAt || null);
-      setMessage('✨ AI generated questions! Review, edit, or publish below.');
+      setContentId(result.contentId || null);
+      setExtractedContent(result.extractedContent || []);
+      setMessage('✨ AI processed PDF! Content extracted and questions generated. Review, edit, or publish below.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to process the uploaded file.');
       setUploadProgress(0);
@@ -129,7 +129,7 @@ export default function PdfExamComposer() {
           title,
           description,
           questions: questions.filter((q) => q.prompt.trim()),
-          pdfId,
+          contentId,
           publish,
         }),
       });
@@ -144,7 +144,7 @@ export default function PdfExamComposer() {
       setFileName('');
       setTitle('');
       setDescription('');
-      setPdfId(null);
+      setContentId(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to save the exam.');
     } finally {
@@ -154,9 +154,9 @@ export default function PdfExamComposer() {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-2xl font-medium text-slate-800">PDF / Image to Exam (Gemini AI)</h2>
+      <h2 className="text-2xl font-medium text-slate-800">PDF to Exam (Gemini AI)</h2>
       <p className="mt-1 text-sm text-slate-500">
-        Upload course materials. Gemini reads text and visuals to generate structured questions.
+        Upload course materials. Gemini AI directly processes PDFs to generate structured questions. No PDF storage required.
       </p>
 
       {/* AI Customization Controls */}
@@ -218,13 +218,6 @@ export default function PdfExamComposer() {
           </div>
         )}
       </label>
-
-      {expiresAt && (
-        <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3">
-          <p className="text-xs font-medium text-amber-800">⏰ PDF expires: {new Date(expiresAt).toLocaleString()}</p>
-          <p className="text-xs text-amber-600 mt-1">Educational content will be stored permanently</p>
-        </div>
-      )}
 
       {questions.length > 0 && (
         <div className="mt-8 space-y-6">

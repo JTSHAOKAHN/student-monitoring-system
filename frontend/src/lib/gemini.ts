@@ -26,27 +26,44 @@ JSON schema:
   ]
 }`;
 
-const EXTRACTION_PROMPT = `You are an expert at extracting educational content from PDF documents.
-Your role is to extract and structure the text content from uploaded course materials.
+const COMBINED_PROMPT = `You are an expert at processing educational PDF documents for exam creation.
+Your role is to:
+1. Extract and structure the text content from the uploaded PDF
+2. Generate high-quality exam questions based on the extracted content
 
 Rules:
 - Extract all meaningful text content from the document
 - Preserve the structure (headings, paragraphs, sections)
 - Identify different content types (headings, body text, tables, code, etc.)
 - Track page numbers when possible
+- Create exam-like questions suitable for formal assessment
+- Prefer a mix of multiple_choice, true_false, short_answer, and fill_blank
+- For multiple_choice, provide exactly 4 options with one correct answer
+- Questions must be grounded in the extracted material
 - Return ONLY valid JSON, no markdown fences
 
 JSON schema:
 {
-  "extracted_content": [
+  "extractedContent": [
     {
       "content": "string",
       "content_type": "text" | "heading" | "table" | "image_caption" | "code",
       "page_number": number,
       "section_title": "string"
     }
+  ],
+  "questions": [
+    {
+      "prompt": "string",
+      "question_type": "multiple_choice" | "true_false" | "short_answer" | "fill_blank",
+      "options": [{ "id": "a", "label": "string" }, ...],
+      "correct_answer": "string",
+      "difficulty": "easy" | "medium" | "hard"
+    }
   ]
 }`;
+
+
 
 function getModel() {
   if (!apiKey) {
@@ -55,7 +72,7 @@ function getModel() {
   const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({
     model: 'gemini-2.0-flash',
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: COMBINED_PROMPT,
   });
 }
 
@@ -190,28 +207,43 @@ export interface ExtractedContent {
   section_title?: string;
 }
 
-export async function extractTextFromPDF(
+export interface GeminiProcessingResult {
+  extractedContent: ExtractedContent[];
+  questions: GeneratedQuestion[];
+}
+
+export async function processPDFWithGemini(
   file: File,
-  sourceName: string
-): Promise<ExtractedContent[]> {
+  sourceName: string,
+  options?: GenerateOptions
+): Promise<GeminiProcessingResult> {
   const model = getModel();
   if (!model) {
-    // Fallback: return basic content
-    return [{
-      content: `Unable to extract text from ${sourceName}. PDF processing not available.`,
-      content_type: 'text',
-      page_number: 1,
-      section_title: 'Error'
-    }];
+    return {
+      extractedContent: [{
+        content: `Unable to process ${sourceName}. Gemini API not configured.`,
+        content_type: 'text' as const,
+        page_number: 1,
+        section_title: 'Error'
+      }],
+      questions: fallbackQuestions(sourceName)
+    };
   }
 
   const arrayBuffer = await file.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString('base64');
   const mimeType = file.type || 'application/pdf';
+  const count = options?.count || 5;
 
   const promptText = `Source file name: ${sourceName}
+Target Question Count: ${count}
+${options?.difficulty && options.difficulty !== 'mixed' ? `Target Difficulty: ${options.difficulty}` : ''}
+${options?.topicFocus ? `Topic Focus: ${options.topicFocus}` : ''}
 
-Extract and structure all text content from this PDF document. Follow the JSON schema for content extraction.`;
+Process this PDF document:
+1. Extract and structure all text content
+2. Generate exactly ${count} exam questions based on the content
+Return both extracted content and questions following the JSON schema where the extracted content is under the key "extractedContent".`;
 
   const result = await model.generateContent([
     {
@@ -228,18 +260,99 @@ Extract and structure all text content from this PDF document. Follow the JSON s
   const text = result.response.text();
   try {
     const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned) as { extracted_content?: ExtractedContent[] };
+    const parsed = JSON.parse(cleaned) as { extractedContent?: ExtractedContent[]; questions?: GeneratedQuestion[] };
 
-    if (!Array.isArray(parsed.extracted_content) || parsed.extracted_content.length === 0) {
+    // Validate and provide fallbacks if needed
+    const extractedContent = Array.isArray(parsed.extractedContent) && parsed.extractedContent.length > 0 
+      ? parsed.extractedContent 
+      : [{
+        content: `Unable to properly extract structured content from ${sourceName}. Using basic extraction.`,
+        content_type: 'text' as const,
+        page_number: 1,
+        section_title: 'Fallback'
+      }];
+
+    const processedQuestions = Array.isArray(parsed.questions) && parsed.questions.length > 0
+      ? parsed.questions
+      : fallbackQuestions(sourceName);
+
+    return {
+      extractedContent,
+      questions: processedQuestions
+    };
+  } catch {
+    return {
+      extractedContent: [{
+        content: `Unable to properly process ${sourceName}. Using basic extraction.`,
+        content_type: 'text' as const,
+        page_number: 1,
+        section_title: 'Fallback'
+      }],
+      questions: fallbackQuestions(sourceName)
+    };
+  }
+}
+
+export async function extractTextFromPDF(
+  file: File,
+  sourceName: string
+): Promise<ExtractedContent[]> {
+  const model = getModel();
+  if (!model) {
+    // Fallback: return basic content
+    return [{
+      content: `Unable to extract text from ${sourceName}. PDF processing not available.`,
+      content_type: 'text' as const,
+      page_number: 1,
+      section_title: 'Error'
+    }];
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString('base64');
+  const mimeType = file.type || 'application/pdf';
+
+  const promptText = `Source file name: ${sourceName}
+
+Extract and structure all text content from this PDF document. Use this JSON schema:
+{
+  "extractedContent": [
+    {
+      "content": "string",
+      "content_type": "text" | "heading" | "table" | "image_caption" | "code",
+      "page_number": number,
+      "section_title": "string"
+    }
+  ]
+}`;
+
+  const result = await model.generateContent([
+    {
+      inlineData: {
+        mimeType,
+        data: base64,
+      },
+    },
+    {
+      text: promptText,
+    },
+  ]);
+
+  const text = result.response.text();
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(cleaned) as { extractedContent?: ExtractedContent[] };
+
+    if (!Array.isArray(parsed.extractedContent) || parsed.extractedContent.length === 0) {
       throw new Error('Invalid extraction payload from Gemini.');
     }
 
-    return parsed.extracted_content;
+    return parsed.extractedContent;
   } catch {
     // Fallback: return basic content
     return [{
       content: `Unable to properly extract structured content from ${sourceName}. Using basic extraction.`,
-      content_type: 'text',
+      content_type: 'text' as const,
       page_number: 1,
       section_title: 'Fallback'
     }];

@@ -126,7 +126,7 @@ function getModel(userType: 'teacher' | 'student' = 'teacher') {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash', // Changed from gemini-3.5-flash to correct model name
+      model: 'gemini-1.5-pro', // Use the pro model instead of flash
       systemInstruction: userType === 'student' ? STUDY_PROMPT : COMBINED_PROMPT,
     });
   } catch (error) {
@@ -375,12 +375,13 @@ ${userType === 'student'
     };
   } catch (error) {
     console.error('PDF processing error:', error);
+    // Return fallback when Gemini fails
     return {
       extractedContent: [{
-        content: `Unable to properly process ${sourceName}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `Gemini API unavailable - using fallback questions for ${sourceName}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         content_type: 'text' as const,
         page_number: 1,
-        section_title: 'Error'
+        section_title: 'Fallback Mode'
       }],
       questions: fallbackQuestions(sourceName)
     };

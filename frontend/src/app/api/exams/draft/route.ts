@@ -18,14 +18,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid draft payload.' }, { status: 400 });
     }
 
-    // Skip authentication for testing
-    const { supabase } = await getAuthenticatedProfile();
+    const { supabase, profile, teacher } = await getAuthenticatedProfile();
     if (!supabase) {
       return NextResponse.json({ error: 'Database service unavailable' }, { status: 500 });
     }
 
-    // For testing, use a fixed teacher ID (this should be replaced with real auth in production)
-    const teacherId = 'test-teacher-id';
+    // Use real teacher ID if available, otherwise create/get a test teacher
+    let teacherId = teacher?.id;
+    
+    if (!teacherId) {
+      // Try to get or create a test teacher
+      const { data: testTeacher } = await supabase
+        .from('teachers')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      
+      if (testTeacher) {
+        teacherId = testTeacher.id;
+      } else {
+        // Create a test teacher for development
+        const { data: newTeacher } = await supabase
+          .from('teachers')
+          .insert({})
+          .select('id')
+          .single();
+        
+        if (newTeacher) {
+          teacherId = newTeacher.id;
+        } else {
+          return NextResponse.json({ error: 'Unable to create or find teacher account' }, { status: 500 });
+        }
+      }
+    }
 
     const shouldPublish = publish === true;
 

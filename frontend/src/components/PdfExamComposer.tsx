@@ -83,7 +83,7 @@ export default function PdfExamComposer() {
 
       setQuestions(result.questions || []);
       setExtractedContent(result.extractedContent || []);
-      setMessage('✨ AI processed PDF! Content extracted and questions generated. Review, edit, or publish below. Each upload generates unique questions.');
+      setMessage(`✨ AI processed PDF! Generated ${result.questions?.length || 0} questions. Review below or publish directly. Content extracted: ${result.extractedContent?.length || 0} sections.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to process the uploaded file.');
       setUploadProgress(0);
@@ -118,13 +118,38 @@ export default function PdfExamComposer() {
       return;
     }
 
+    if (questions.length === 0) {
+      setMessage('Please upload a PDF to generate questions first.');
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
 
     try {
-      // For now, just show success message since we're not using database storage
-      // In a real implementation, this would save to Supabase
-      setMessage(publish ? '🚀 Exam ready! Questions have been generated and are ready for students.' : '💾 Exam questions saved for review.');
+      const response = await fetch('/api/exams/draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          questions,
+          publish,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save exam');
+      }
+
+      setMessage(publish 
+        ? '🚀 Exam published successfully! Students can now see and take this exam.' 
+        : '💾 Exam saved as draft. You can edit and publish it later.'
+      );
       
       // Clear form after a delay
       setTimeout(() => {
@@ -132,6 +157,7 @@ export default function PdfExamComposer() {
         setFileName('');
         setTitle('');
         setDescription('');
+        setExtractedContent([]);
         setMessage(null);
       }, 3000);
     } catch (error) {
@@ -211,6 +237,22 @@ export default function PdfExamComposer() {
           </div>
         )}
       </label>
+
+      {extractedContent.length > 0 && (
+        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+          <h3 className="text-lg font-medium text-slate-800">📄 Extracted Content Preview</h3>
+          <div className="mt-3 max-h-48 overflow-y-auto rounded bg-slate-50 p-3 text-sm text-slate-700">
+            {extractedContent.slice(0, 5).map((content, idx) => (
+              <div key={idx} className="mb-2 border-b border-slate-200 pb-2 last:border-0">
+                <span className="font-medium text-violet-600">{content.content_type}</span>
+                {content.section_title && <span className="ml-2 text-slate-500">({content.section_title})</span>}
+                <p className="mt-1 text-slate-600">{content.content?.substring(0, 200)}{content.content?.length > 200 ? '...' : ''}</p>
+              </div>
+            ))}
+            {extractedContent.length > 5 && <p className="text-xs text-slate-500">... and {extractedContent.length - 5} more sections</p>}
+          </div>
+        </div>
+      )}
 
       {questions.length > 0 && (
         <div className="mt-8 space-y-6">

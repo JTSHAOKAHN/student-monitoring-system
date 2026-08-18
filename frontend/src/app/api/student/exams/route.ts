@@ -32,7 +32,7 @@ export async function GET() {
 
     const { data: exams, error } = await supabase
       .from('exams')
-      .select('id, title, description, published')
+      .select('id, title, description, published, duration_minutes')
       .eq('published', true);
 
     if (error) {
@@ -41,6 +41,19 @@ export async function GET() {
     }
 
     console.log('Exams loaded:', exams);
+
+    // Get question counts for each exam
+    const examIds = (exams || []).map(e => e.id);
+    const { data: questionCounts } = await supabase
+      .from('questions')
+      .select('exam_id')
+      .in('exam_id', examIds);
+
+    const questionCountMap = new Map();
+    (questionCounts || []).forEach(q => {
+      const current = questionCountMap.get(q.exam_id) || 0;
+      questionCountMap.set(q.exam_id, current + 1);
+    });
 
     const { data: attempts, error: attemptsError } = await supabase
       .from('attempts')
@@ -60,8 +73,8 @@ export async function GET() {
         id: exam.id,
         title: exam.title,
         description: exam.description,
-        duration_minutes: 60, // Default value since column doesn't exist
-        question_count: 0, // Default since we can't count without questions table
+        duration_minutes: exam.duration_minutes || 60,
+        question_count: questionCountMap.get(exam.id) || 0,
         attempt_status: attempt?.status ?? null,
         attempt_id: attempt?.id ?? null,
       };

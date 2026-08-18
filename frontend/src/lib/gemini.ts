@@ -3,6 +3,10 @@ import type { GeneratedQuestion } from './types';
 
 const apiKey = process.env.GEMINI_API_KEY;
 
+if (!apiKey) {
+  console.error('GEMINI_API_KEY is not configured in environment variables');
+}
+
 const SYSTEM_PROMPT = `You are an expert exam designer for educational institutions.
 Your role is to read and understand uploaded course materials (text and images), then generate high-quality exam questions.
 
@@ -115,13 +119,20 @@ JSON schema:
 
 function getModel(userType: 'teacher' | 'student' = 'teacher') {
   if (!apiKey) {
+    console.error('GEMINI_API_KEY is not configured');
     return null;
   }
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash',
-    systemInstruction: userType === 'student' ? STUDY_PROMPT : COMBINED_PROMPT,
-  });
+  
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    return genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash', // Changed from gemini-3.5-flash to correct model name
+      systemInstruction: userType === 'student' ? STUDY_PROMPT : COMBINED_PROMPT,
+    });
+  } catch (error) {
+    console.error('Failed to initialize Gemini model:', error);
+    return null;
+  }
 }
 
 function fallbackQuestions(sourceName: string): GeneratedQuestion[] {
@@ -276,10 +287,12 @@ export async function processPDFWithGemini(
 ): Promise<GeminiProcessingResult> {
   const userType = options?.userType || 'teacher';
   const model = getModel(userType);
+  
   if (!model) {
+    console.error('Gemini model initialization failed');
     return {
       extractedContent: [{
-        content: `Unable to process ${sourceName}. Gemini API not configured.`,
+        content: `Unable to process ${sourceName}. Gemini API not configured or initialization failed.`,
         content_type: 'text' as const,
         page_number: 1,
         section_title: 'Error'
@@ -288,16 +301,17 @@ export async function processPDFWithGemini(
     };
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString('base64');
-  const mimeType = file.type || 'application/pdf';
-  const count = options?.count || 5;
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    const mimeType = file.type || 'application/pdf';
+    const count = options?.count || 5;
 
-  // Add random seed to ensure different questions for same PDF
-  const randomSeed = options?.useRandomSeed ? Math.random().toString(36).substring(7) : '';
-  const seedInstruction = randomSeed ? `Random Seed: ${randomSeed} - Generate unique questions based on this seed.` : '';
+    // Add random seed to ensure different questions for same PDF
+    const randomSeed = options?.useRandomSeed ? Math.random().toString(36).substring(7) : '';
+    const seedInstruction = randomSeed ? `Random Seed: ${randomSeed} - Generate unique questions based on this seed.` : '';
 
-  const promptText = `Source file name: ${sourceName}
+    const promptText = `Source file name: ${sourceName}
 User Type: ${userType}
 Target Question Count: ${count}
 ${options?.difficulty && options.difficulty !== 'mixed' ? `Target Difficulty: ${options.difficulty}` : ''}
@@ -309,26 +323,30 @@ ${userType === 'student'
   : 'Process this PDF document: 1. Extract and structure all text content 2. Generate exactly ${count} exam questions based on the content. Return both extracted content and questions following the JSON schema where the extracted content is under the key "extractedContent".'
 }`;
 
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        mimeType,
-        data: base64,
+    console.log('Starting Gemini processing...');
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType,
+          data: base64,
+        },
       },
-    },
-    {
-      text: promptText,
-    },
-  ]);
+      {
+        text: promptText,
+      },
+    ]);
 
-  const text = result.response.text();
-  try {
+    const text = result.response.text();
+    console.log('Gemini response received, parsing...');
+    
     const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(cleaned) as { 
       extractedContent?: ExtractedContent[]; 
       questions?: GeneratedQuestion[];
       studyFocusAreas?: StudyFocusArea[];
     };
+
+    console.log('Parsed result:', { hasContent: !!parsed.extractedContent, hasQuestions: !!parsed.questions });
 
     // Validate and provide fallbacks if needed
     const extractedContent = Array.isArray(parsed.extractedContent) && parsed.extractedContent.length > 0 
@@ -348,18 +366,21 @@ ${userType === 'student'
       ? parsed.studyFocusAreas
       : undefined;
 
+    console.log('Processing complete:', { contentLength: extractedContent.length, questionCount: processedQuestions.length });
+
     return {
       extractedContent,
       questions: processedQuestions,
       studyFocusAreas
     };
-  } catch {
+  } catch (error) {
+    console.error('PDF processing error:', error);
     return {
       extractedContent: [{
-        content: `Unable to properly process ${sourceName}. Using basic extraction.`,
+        content: `Unable to properly process ${sourceName}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         content_type: 'text' as const,
         page_number: 1,
-        section_title: 'Fallback'
+        section_title: 'Error'
       }],
       questions: fallbackQuestions(sourceName)
     };

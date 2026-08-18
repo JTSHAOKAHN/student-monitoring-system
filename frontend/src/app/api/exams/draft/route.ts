@@ -23,35 +23,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Database service unavailable' }, { status: 500 });
     }
 
-    // Use real teacher ID if available, otherwise create/get a test teacher
-    let teacherId = teacher?.id;
-    
-    if (!teacherId) {
-      // Try to get or create a test teacher
-      const { data: testTeacher } = await supabase
-        .from('teachers')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      
-      if (testTeacher) {
-        teacherId = testTeacher.id;
-      } else {
-        // Create a test teacher for development
-        const { data: newTeacher } = await supabase
-          .from('teachers')
-          .insert({})
-          .select('id')
-          .single();
-        
-        if (newTeacher) {
-          teacherId = newTeacher.id;
-        } else {
-          return NextResponse.json({ error: 'Unable to create or find teacher account' }, { status: 500 });
-        }
-      }
+    if (!profile || profile.role !== 'teacher' || !teacher) {
+      return NextResponse.json({ error: 'Only teachers can publish exams.' }, { status: 403 });
     }
 
+    const teacherId = teacher.id;
     const shouldPublish = publish === true;
 
     const { data: exam, error: examError } = await supabase

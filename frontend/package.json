@@ -21,16 +21,12 @@
     "resend": "^4.7.0"
   },
   "devDependencies": {
-    "@babel/core": "^8.0.1",
-    "@babel/preset-env": "^8.0.2",
-    "@babel/preset-typescript": "^8.0.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "babel-jest": "^30.4.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "jest": "^30.4.2",
@@ -51,9 +47,7 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
     },
-    "transform": {
-      "^.+\\.(ts|tsx)$": ["babel-jest", { "presets": ["@babel/preset-env", "@babel/preset-typescript"] }]
-    },
-    "preset": "ts-jest"
+    "preset": "ts-jest",
+    "transform": {}
   }
 }

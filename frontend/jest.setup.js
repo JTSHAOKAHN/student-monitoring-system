@@ -1,4 +1,5 @@
-require('@testing-library/jest-dom');
+// Simple test setup without testing-library dependencies
+console.log('Jest setup complete');
 
 // Mock Supabase
 jest.mock('@supabase/supabase-js', () => ({
